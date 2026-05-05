@@ -97,13 +97,9 @@
     }
 
     .sidebar-toggle {
-      position: fixed;
-      top: 14px;
-      left: 252px;
-      z-index: 100;
       width: 24px;
       height: 24px;
-      background: var(--bg-panel);
+      background: transparent;
       border: 1px solid var(--border);
       border-radius: 3px;
       color: var(--cyan-dim);
@@ -113,16 +109,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: left 0.25s ease, color 0.15s;
+      flex-shrink: 0;
+      transition: color 0.15s, border-color 0.15s;
     }
 
     .sidebar-toggle:hover {
       color: var(--cyan);
       border-color: var(--cyan-dim);
-    }
-
-    body.sidebar-collapsed .sidebar-toggle {
-      left: 12px;
     }
 
     .sidebar-header {
@@ -1260,7 +1253,6 @@
 </head>
 <body>
   <div class="scanline"></div>
-  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="收起/展开侧边栏">&#9776;</button>
   <div class="app">
     <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
@@ -1284,6 +1276,7 @@
     <!-- MAIN -->
     <div class="main">
       <div class="main-header">
+        <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="收起/展开侧边栏">&#9776;</button>
         <span>ACTIVE SESSION</span>
         <span class="line"></span>
         <span id="headerConvId">--</span>
