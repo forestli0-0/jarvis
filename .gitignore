@@ -1,0 +1,10 @@
+node_modules/
+dist/
+web/dist/
+web/node_modules/
+data/
+*.db
+.env
+*.log
+jarvis.config.json
+conversation_test.txt
