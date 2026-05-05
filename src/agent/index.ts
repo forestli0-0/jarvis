@@ -49,13 +49,17 @@ export class Agent {
     while (round < MAX_TOOL_ROUNDS) {
       round++;
 
+      // 最后一轮：强制要求模型生成最终回答，不再调用工具
+      const isLastRound = round >= MAX_TOOL_ROUNDS;
+      const toolDefs = isLastRound ? [] : this.tools.getDefinitions();
+
       const response = await this.model.chat(
         messages,
-        this.tools.getDefinitions(),
-        true,
+        toolDefs,
+        !isLastRound,
         {
-          onToken: (token) => callbacks?.onToken?.(token),
-          onToolCall: (tc) => callbacks?.onToolCall?.(tc),
+          onToken: (token: string) => callbacks?.onToken?.(token),
+          onToolCall: (tc: ToolCall) => callbacks?.onToolCall?.(tc),
         }
       );
 
