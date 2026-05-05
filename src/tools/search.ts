@@ -1,7 +1,7 @@
 import { AgentTool } from '../agent/types';
 
-async function searchSogou(query: string): Promise<{ title: string; snippet: string; url: string }[]> {
-  const url = `https://www.sogou.com/web?query=${encodeURIComponent(query)}`;
+async function search360(query: string): Promise<{ title: string; snippet: string; url: string }[]> {
+  const url = `https://www.so.com/s?q=${encodeURIComponent(query)}`;
   const response = await fetch(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
@@ -14,28 +14,30 @@ async function searchSogou(query: string): Promise<{ title: string; snippet: str
 
   const results: { title: string; snippet: string; url: string }[] = [];
 
-  // 搜狗搜索结果在 <h3> 标签中
-  const h3Blocks = html.split(/<h3[^>]*>/);
-  for (let i = 1; i < h3Blocks.length && results.length < 5; i++) {
-    const block = h3Blocks[i];
+  // 360 搜索结果在 <h3> 标签中，每个 h3 后面可能有摘要
+  const h3Regex = /<h3[^>]*>([\s\S]*?)<\/h3>/gi;
+  let match;
+  while ((match = h3Regex.exec(html)) !== null && results.length < 5) {
+    const h3Content = match[1];
 
-    // 提取 <a href="...">title</a>
-    const aMatch = block.match(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i);
+    // 提取链接和标题
+    const aMatch = h3Content.match(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i);
     if (!aMatch) continue;
 
     let link = aMatch[1];
     let title = aMatch[2].replace(/<[^>]*>/g, '').trim();
-    if (!title) continue;
+    if (!title || title.length < 2) continue;
 
-    // 搜狗的链接可能是跳转链接，提取真实 URL
-    const realUrl = link.match(/url=([^&"]+)/);
-    if (realUrl) link = decodeURIComponent(realUrl[1]);
+    // 跳过"其他人还搜了"等非结果标题
+    if (title.includes('其他人还搜') || title.includes('相关视频')) continue;
 
-    // 提取摘要（在 <div class="ft"> 中）
+    // 提取摘要（在 h3 后面的 <p> 或 <div> 中）
     let snippet = '';
-    const ftMatch = block.match(/<div[^>]*class="ft"[^>]*>([\s\S]*?)<\/div>/i);
-    if (ftMatch) {
-      snippet = ftMatch[1].replace(/<[^>]*>/g, '').trim();
+    const afterH3 = html.slice(match.index + match[0].length, match.index + match[0].length + 1000);
+    const pMatch = afterH3.match(/<p[^>]*>([\s\S]*?)<\/p>/i)
+      || afterH3.match(/<div[^>]*class="[^"]*desc[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    if (pMatch) {
+      snippet = pMatch[1].replace(/<[^>]*>/g, '').trim();
     }
 
     results.push({ url: link, title, snippet });
@@ -62,9 +64,9 @@ export function createSearchTool(): AgentTool {
       const { query } = params;
 
       try {
-        const results = await searchSogou(query);
+        const results = await search360(query);
         if (results.length > 0) {
-          return JSON.stringify({ query, source: 'Sogou', results }, null, 2);
+          return JSON.stringify({ query, source: '360 Search', results }, null, 2);
         }
         return JSON.stringify({ error: '未找到搜索结果', query });
       } catch (err: any) {
