@@ -317,6 +317,66 @@
       position: relative;
     }
 
+    /* === MESSAGE NAV BAR === */
+    .msg-nav {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 20px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 8px 4px;
+      z-index: 10;
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+
+    .msg-nav::-webkit-scrollbar { display: none; }
+
+    .msg-nav-item {
+      height: 4px;
+      min-height: 4px;
+      border-radius: 2px;
+      cursor: pointer;
+      position: relative;
+      transition: opacity 0.15s;
+    }
+
+    .msg-nav-item:hover {
+      opacity: 1 !important;
+    }
+
+    .msg-nav-item.user { background: var(--orange); opacity: 0.6; }
+    .msg-nav-item.assistant { background: var(--cyan); opacity: 0.6; }
+    .msg-nav-item.tool { background: var(--text-dim); opacity: 0.3; height: 3px; min-height: 3px; }
+    .msg-nav-item.streaming { background: var(--cyan); opacity: 0.8; animation: navPulse 1s ease-in-out infinite; }
+
+    @keyframes navPulse {
+      0%, 100% { opacity: 0.8; }
+      50% { opacity: 0.4; }
+    }
+
+    .msg-nav-tooltip {
+      position: fixed;
+      right: 32px;
+      max-width: 280px;
+      padding: 8px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-active);
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--text);
+      font-family: var(--font-body);
+      line-height: 1.5;
+      pointer-events: none;
+      z-index: 200;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     /* === MESSAGES === */
     .messages {
       flex: 1;
@@ -1292,6 +1352,7 @@
       <!-- Content Area: messages + tool panel -->
       <div class="content-area" id="contentArea" style="display:none">
         <div class="messages" id="messages"></div>
+        <div class="msg-nav" id="msgNav"></div>
         <div class="tool-panel" id="toolPanel">
           <div class="tool-panel-header">
             <span>TOOL EXEC LOG</span>
@@ -1814,6 +1875,7 @@
       `;
       container.appendChild(div);
       scrollToBottom();
+      updateMsgNav();
     }
 
     function addAssistantPlaceholder() {
@@ -1830,13 +1892,19 @@
       container.appendChild(div);
       scrollToBottom();
       startSmartScroll();
+      updateMsgNav();
     }
 
+    let navUpdatePending = false;
     function updateStreamingMessage(content) {
       const body = document.getElementById('streamingBody');
       if (body) {
         body.innerHTML = renderMarkdown(content);
-        // 不再每帧跳到底部，由 tickScroll 平滑滚动
+        // 节流更新导航条（每 500ms 最多一次）
+        if (!navUpdatePending) {
+          navUpdatePending = true;
+          setTimeout(() => { updateMsgNav(); navUpdatePending = false; }, 500);
+        }
       }
     }
 
@@ -1872,6 +1940,7 @@
       `;
       container.appendChild(div);
       scrollToBottom();
+      updateMsgNav();
     }
 
     function markToolIndicatorDone(id) {
@@ -1881,6 +1950,82 @@
         const spans = el.querySelectorAll('span');
         if (spans[2]) spans[2].textContent = '完成';
       }
+      updateMsgNav();
+    }
+
+    // === MESSAGE NAV BAR ===
+    let navTooltip = null;
+
+    function updateMsgNav() {
+      const nav = document.getElementById('msgNav');
+      if (!nav) return;
+
+      const msgContainer = document.getElementById('messages');
+      const items = msgContainer.querySelectorAll('.msg, .tool-indicator');
+      const totalHeight = msgContainer.scrollHeight;
+      const visibleHeight = msgContainer.clientHeight;
+
+      // 消息太少时不显示导航
+      if (items.length < 3 || totalHeight <= visibleHeight) {
+        nav.innerHTML = '';
+        return;
+      }
+
+      // 计算每条消息的高度比例
+      nav.innerHTML = '';
+      items.forEach((item, i) => {
+        const bar = document.createElement('div');
+        const isMsg = item.classList.contains('msg');
+        const isStreaming = item.classList.contains('streaming');
+        const isUser = item.classList.contains('user');
+        const isTool = item.classList.contains('tool-indicator');
+
+        if (isStreaming) bar.className = 'msg-nav-item streaming';
+        else if (isUser) bar.className = 'msg-nav-item user';
+        else if (isTool) bar.className = 'msg-nav-item tool';
+        else bar.className = 'msg-nav-item assistant';
+
+        // 高度按消息实际高度比例
+        const ratio = item.offsetHeight / totalHeight;
+        bar.style.flex = `${Math.max(ratio, 0.005)}`;
+
+        // 摘要
+        let summary = '';
+        if (isUser) {
+          summary = item.querySelector('.msg-body')?.textContent?.trim().substring(0, 80) || '用户消息';
+        } else if (isMsg) {
+          summary = item.querySelector('.msg-body')?.textContent?.trim().substring(0, 80) || 'JARVIS';
+        } else if (isTool) {
+          summary = item.querySelector('.ti-name')?.textContent?.trim() || '工具调用';
+        }
+
+        // 点击跳转
+        bar.addEventListener('click', () => {
+          item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        // 悬浮提示
+        bar.addEventListener('mouseenter', (e) => {
+          if (!navTooltip) {
+            navTooltip = document.createElement('div');
+            navTooltip.className = 'msg-nav-tooltip';
+            document.body.appendChild(navTooltip);
+          }
+          navTooltip.textContent = summary;
+          navTooltip.style.top = e.clientY - 16 + 'px';
+          navTooltip.style.display = 'block';
+        });
+
+        bar.addEventListener('mousemove', (e) => {
+          if (navTooltip) navTooltip.style.top = e.clientY - 16 + 'px';
+        });
+
+        bar.addEventListener('mouseleave', () => {
+          if (navTooltip) navTooltip.style.display = 'none';
+        });
+
+        nav.appendChild(bar);
+      });
     }
 
     // === TOOL PANEL (right side) ===
