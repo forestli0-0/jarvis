@@ -293,25 +293,12 @@
       min-width: 0;
     }
 
-    /* 扫描光效：文字生成时的视觉提示 */
+    /* 扫描线：快速掠过的细线 */
     @keyframes scanLine {
-      0% { top: -2px; opacity: 0; }
-      10% { opacity: 1; }
-      90% { opacity: 1; }
-      100% { top: calc(100% + 2px); opacity: 0; }
-    }
-
-    .msg.assistant.streaming::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--cyan), var(--cyan-glow-strong), var(--cyan), transparent);
-      box-shadow: 0 0 12px var(--cyan), 0 0 30px var(--cyan-glow);
-      animation: scanLine 2.5s ease-in-out infinite;
-      pointer-events: none;
-      z-index: 1;
+      0% { top: -1px; opacity: 0; }
+      5% { opacity: 0.7; }
+      95% { opacity: 0.7; }
+      100% { top: 100%; opacity: 0; }
     }
 
     .msg.assistant.streaming {
@@ -319,14 +306,17 @@
       overflow: hidden;
     }
 
-    .msg.assistant.streaming::after {
+    .msg.assistant.streaming::before {
       content: '';
       position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, transparent 0%, var(--cyan-glow) 50%, transparent 100%);
-      opacity: 0.06;
-      animation: scanLine 2.5s ease-in-out infinite;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--cyan);
+      opacity: 0.7;
+      animation: scanLine 1s linear infinite;
       pointer-events: none;
+      z-index: 1;
     }
 
     .msg {
@@ -1919,7 +1909,7 @@
     let scrollRaf = null;
     let isStreamingActive = false;
     let lastScrollTime = 0;
-    const SCROLL_SPEED = 40; // 像素/秒，恒定速度
+    const SCROLL_SPEED = 80; // 像素/秒，恒定速度
 
     function scrollToBottom() {
       const container = document.getElementById('messages');
