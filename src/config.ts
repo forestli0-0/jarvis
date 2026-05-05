@@ -47,6 +47,7 @@ export function loadConfig(): JarvisConfig {
       model: { ...DEFAULT_CONFIG.model, ...userConfig.model },
       server: { ...DEFAULT_CONFIG.server, ...userConfig.server },
       workspace: userConfig.workspace || DEFAULT_CONFIG.workspace,
+      search: userConfig.search,
     };
   }
   // 如果配置文件不存在，创建默认配置
