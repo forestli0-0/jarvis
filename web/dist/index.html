@@ -225,6 +225,15 @@
       gap: 8px;
     }
 
+    .datetime-bar {
+      padding: 8px 16px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--cyan-dim);
+      letter-spacing: 1px;
+      line-height: 1.6;
+    }
+
     .status-dot {
       width: 6px;
       height: 6px;
@@ -1204,6 +1213,7 @@
         <span class="status-dot"></span>
         <span id="statusText">SYSTEM ONLINE</span>
       </div>
+      <div class="datetime-bar" id="datetimeBar"></div>
     </div>
 
     <!-- MAIN -->
@@ -1909,6 +1919,16 @@
       document.getElementById('sendBtn').disabled = isStreaming;
     }
 
+    function updateDateTime() {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const date = `${now.getFullYear()}.${pad(now.getMonth()+1)}.${pad(now.getDate())}`;
+      const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      const days = ['日','一','二','三','四','五','六'];
+      document.getElementById('datetimeBar').innerHTML =
+        `${date} 星期${days[now.getDay()]}<br>${time}`;
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       const textarea = document.getElementById('userInput');
       textarea.addEventListener('input', () => {
@@ -1916,6 +1936,8 @@
         textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
         document.getElementById('sendBtn').disabled = !textarea.value.trim() || isStreaming;
       });
+      updateDateTime();
+      setInterval(updateDateTime, 1000);
       init();
     });
   </script>

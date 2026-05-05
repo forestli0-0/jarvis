@@ -59,7 +59,14 @@ export function buildMemoryContext(): string {
 export function getSystemPrompt(): string {
   const memoryContext = buildMemoryContext();
 
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const days = ['日','一','二','三','四','五','六'];
+  const currentTime = `${now.getFullYear()}年${pad(now.getMonth()+1)}月${pad(now.getDate())}日 星期${days[now.getDay()]} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
   let prompt = `你是 JARVIS，一个专属的个人 AI 管家。你聪明、高效、忠诚，像钢铁侠中的 JARVIS 一样。
+
+当前时间：${currentTime}
 
 你的能力：
 - 读写文件
