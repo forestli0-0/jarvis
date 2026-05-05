@@ -12,7 +12,9 @@ import { createFileTool } from './tools/file';
 import { createSearchTool } from './tools/search';
 import { createCodeExecTool } from './tools/code-exec';
 import { createShellTool } from './tools/shell';
+import { createMemoryTraceTool } from './tools/memory-trace';
 import { closeDb } from './db';
+import { consolidateMemories } from './memory';
 
 import chatRouter, { setAgent, setupSocketHandlers } from './routes/chat';
 import conversationsRouter from './routes/conversations';
@@ -27,6 +29,7 @@ toolRegistry.register(createFileTool(workspace));
 toolRegistry.register(createSearchTool());
 toolRegistry.register(createCodeExecTool());
 toolRegistry.register(createShellTool(workspace));
+toolRegistry.register(createMemoryTraceTool());
 
 // 初始化模型和 Agent
 const model = new ModelAdapter(config.model);
@@ -76,6 +79,18 @@ httpServer.listen(PORT, () => {
   console.log(`   模型: ${config.model.model_name}`);
   console.log(`   工作目录: ${workspace}\n`);
 });
+
+// 每小时自动整合记忆
+setInterval(() => {
+  try {
+    const count = consolidateMemories();
+    if (count > 0) {
+      console.log(`[Memory] 已整合 ${count} 条记忆`);
+    }
+  } catch (err) {
+    console.error('[Memory] 整合失败:', err);
+  }
+}, 60 * 60 * 1000);
 
 // 优雅关闭
 process.on('SIGINT', () => {

@@ -940,6 +940,9 @@
       color: var(--text-dim);
       white-space: nowrap;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .memory-card .mc-delete {
@@ -949,12 +952,11 @@
       cursor: pointer;
       font-size: 14px;
       padding: 0 4px;
-      opacity: 0;
       transition: all 0.2s;
       flex-shrink: 0;
     }
 
-    .memory-card:hover .mc-delete {
+    .memory-card .mc-delete:hover {
       opacity: 0.6;
     }
 
@@ -974,6 +976,126 @@
       color: var(--text-dim);
       font-family: var(--font-mono);
       font-size: 13px;
+    }
+
+    .memory-filters {
+      display: flex;
+      gap: 8px;
+      padding: 0 0 16px;
+    }
+    .mf-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 4px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.2s;
+    }
+    .mf-btn.active, .mf-btn:hover {
+      border-color: var(--cyan-dim);
+      color: var(--cyan);
+      background: var(--cyan-glow);
+    }
+
+    .mc-tier {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      letter-spacing: 0.5px;
+    }
+    .mc-tier-long { background: rgba(0,230,118,0.15); color: #00e676; }
+    .mc-tier-short { background: rgba(255,109,0,0.15); color: #ff6d00; }
+
+    .mc-hits {
+      font-size: 11px;
+      color: var(--cyan-dim);
+      font-family: var(--font-mono);
+      margin-left: 6px;
+    }
+
+    .mc-date {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      margin-left: auto;
+    }
+
+    .mc-actions {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      gap: 6px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .memory-card:hover .mc-actions { opacity: 1; }
+
+    .mc-trace-btn {
+      background: transparent;
+      border: 1px solid var(--cyan-dim);
+      color: var(--cyan);
+      padding: 2px 8px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.2s;
+    }
+    .mc-trace-btn:hover {
+      background: var(--cyan-glow);
+    }
+
+    .mc-consolidate-btn {
+      background: transparent;
+      border: 1px solid var(--orange-dim);
+      color: var(--orange);
+      padding: 3px 12px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      border-radius: 3px;
+      margin-left: auto;
+      transition: all 0.2s;
+    }
+    .mc-consolidate-btn:hover {
+      background: var(--orange-glow);
+    }
+
+    .mc-source-panel {
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .mc-src-conv {
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .mc-src-conv:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .mc-src-title {
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+    .mc-src-msg {
+      color: var(--text-dim);
+      font-size: 11px;
+      line-height: 1.5;
+      padding: 2px 0;
+    }
+    .mc-src-role {
+      color: var(--text);
+      font-weight: 600;
     }
 
     /* === MEMORY TOAST === */
@@ -1399,16 +1521,74 @@
       summary: '📝'
     };
 
+    let memoryTierFilter = 'all';
+
+    function setMemoryFilter(tier) {
+      memoryTierFilter = tier;
+      loadMemoryPanel();
+    }
+
+    async function triggerConsolidation() {
+      try {
+        const res = await fetch('/api/memory/consolidate', { method: 'POST' });
+        const data = await res.json();
+        showToast(`已整理 ${data.consolidated} 条记忆`);
+        loadMemoryPanel();
+      } catch (e) {
+        showToast('整理失败');
+      }
+    }
+
+    async function toggleMemorySource(id, btn) {
+      const card = btn.closest('.memory-card');
+      const existing = card.querySelector('.mc-source-panel');
+      if (existing) {
+        existing.remove();
+        return;
+      }
+      try {
+        const res = await fetch(`/api/memory/${id}/chain`);
+        const chain = await res.json();
+        if (!chain.sources || chain.sources.length === 0) {
+          showToast('无源头信息');
+          return;
+        }
+        const srcHtml = chain.sources.map(s => {
+          const msgs = (s.messages || []).map(m =>
+            `<div class="mc-src-msg"><span class="mc-src-role">${m.role}:</span> ${escHtml((m.content || '').slice(0, 150))}</div>`
+          ).join('');
+          return `<div class="mc-src-conv">
+            <div class="mc-src-title">${escHtml(s.conversation_title || '未知对话')}</div>
+            ${msgs}
+          </div>`;
+        }).join('');
+        const div = document.createElement('div');
+        div.className = 'mc-source-panel';
+        div.innerHTML = srcHtml;
+        card.appendChild(div);
+      } catch (e) {
+        showToast('溯源失败');
+      }
+    }
+
     async function loadMemoryPanel() {
       const panel = document.getElementById('memoryPanel');
       try {
-        const res = await fetch('/api/memory');
+        const url = memoryTierFilter === 'all' ? '/api/memory' : `/api/memory?tier=${memoryTierFilter}`;
+        const res = await fetch(url);
         const allMemories = await res.json();
         const memories = allMemories.filter(m => m.content && m.content.trim());
 
         if (memories.length === 0) {
           panel.innerHTML = `
-            <div class="memory-panel-header">MEMORY BANK <span class="line"></span></div>
+            <div class="memory-panel-header">MEMORY BANK <span class="line"></span>
+              <button class="mc-consolidate-btn" onclick="triggerConsolidation()" title="整理记忆">整理</button>
+            </div>
+            <div class="memory-filters">
+              <button class="mf-btn ${memoryTierFilter === 'all' ? 'active' : ''}" onclick="setMemoryFilter('all')">全部</button>
+              <button class="mf-btn ${memoryTierFilter === 'short' ? 'active' : ''}" onclick="setMemoryFilter('short')">短期</button>
+              <button class="mf-btn ${memoryTierFilter === 'long' ? 'active' : ''}" onclick="setMemoryFilter('long')">长期</button>
+            </div>
             <div class="memory-empty">暂无记忆数据。与 JARVIS 对话后会自动整理生成。</div>
           `;
           return;
@@ -1434,13 +1614,27 @@
         const sectionsHtml = Object.entries(grouped)
           .filter(([, items]) => items.length > 0)
           .map(([type, items]) => {
-            const cards = items.map(m => `
-              <div class="memory-card memory-type-${m.type}">
-                <div class="mc-content">${escHtml(m.content)}</div>
-                <div class="mc-meta">${formatDate(m.created_at)}</div>
-                <button class="mc-delete" onclick="deleteMemoryCard('${m.id}')" title="删除">&times;</button>
-              </div>
-            `).join('');
+            const cards = items.map(m => {
+              const tierBadge = m.tier === 'long'
+                ? '<span class="mc-tier mc-tier-long">LONG</span>'
+                : '<span class="mc-tier mc-tier-short">SHORT</span>';
+              const hitBadge = m.hit_count > 0
+                ? `<span class="mc-hits" title="引用次数">x${m.hit_count}</span>`
+                : '';
+              return `
+                <div class="memory-card memory-type-${m.type}">
+                  <div class="mc-content">${escHtml(m.content)}</div>
+                  <div class="mc-meta">
+                    ${tierBadge} ${hitBadge}
+                    <span class="mc-date">${formatDate(m.created_at)}</span>
+                  </div>
+                  <div class="mc-actions">
+                    <button class="mc-trace-btn" onclick="toggleMemorySource('${m.id}', this)" title="溯源">溯源</button>
+                    <button class="mc-delete" onclick="deleteMemoryCard('${m.id}')" title="删除">&times;</button>
+                  </div>
+                </div>
+              `;
+            }).join('');
             return `
               <div class="memory-section">
                 <div class="memory-section-title">${MEMORY_TYPE_ICONS[type]} ${MEMORY_TYPE_LABELS[type]} (${items.length})</div>
@@ -1450,7 +1644,14 @@
           }).join('');
 
         panel.innerHTML = `
-          <div class="memory-panel-header">MEMORY BANK <span class="line"></span></div>
+          <div class="memory-panel-header">MEMORY BANK <span class="line"></span>
+            <button class="mc-consolidate-btn" onclick="triggerConsolidation()" title="整理记忆">整理</button>
+          </div>
+          <div class="memory-filters">
+            <button class="mf-btn ${memoryTierFilter === 'all' ? 'active' : ''}" onclick="setMemoryFilter('all')">全部</button>
+            <button class="mf-btn ${memoryTierFilter === 'short' ? 'active' : ''}" onclick="setMemoryFilter('short')">短期</button>
+            <button class="mf-btn ${memoryTierFilter === 'long' ? 'active' : ''}" onclick="setMemoryFilter('long')">长期</button>
+          </div>
           <div class="memory-stats">${statsHtml}</div>
           ${sectionsHtml}
         `;
@@ -1460,6 +1661,16 @@
           <div class="memory-empty">加载失败: ${e.message}</div>
         `;
       }
+    }
+
+    function showToast(msg) {
+      const existing = document.querySelector('.memory-toast');
+      if (existing) existing.remove();
+      const div = document.createElement('div');
+      div.className = 'memory-toast show';
+      div.innerHTML = `<div class="mt-content">${escHtml(msg)}</div>`;
+      document.body.appendChild(div);
+      setTimeout(() => div.remove(), 3000);
     }
 
     async function deleteMemoryCard(id) {
