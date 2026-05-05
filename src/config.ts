@@ -12,10 +12,16 @@ export interface ServerConfig {
   port: number;
 }
 
+export interface SearchConfig {
+  provider: 'tavily' | 'serper' | 'bing';
+  api_key?: string;
+}
+
 export interface JarvisConfig {
   model: ModelConfig;
   server: ServerConfig;
   workspace: string;
+  search?: SearchConfig;
 }
 
 const CONFIG_PATH = path.join(process.cwd(), 'jarvis.config.json');

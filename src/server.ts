@@ -27,7 +27,7 @@ const config = loadConfig();
 const toolRegistry = new ToolRegistry();
 const workspace = path.resolve(config.workspace);
 toolRegistry.register(createFileTool(workspace));
-toolRegistry.register(createSearchTool());
+toolRegistry.register(createSearchTool(config.search));
 toolRegistry.register(createCodeExecTool());
 toolRegistry.register(createShellTool(workspace));
 toolRegistry.register(createMemoryTraceTool());
