@@ -2,7 +2,6 @@ import { execSync } from 'child_process';
 import { AgentTool } from '../agent/types';
 
 export function createShellTool(workspace: string): AgentTool {
-  // 禁止执行的危险命令
   const BLOCKED = ['rm -rf /', 'format', 'mkfs', 'dd if='];
 
   return {
@@ -21,7 +20,6 @@ export function createShellTool(workspace: string): AgentTool {
     async execute(params) {
       const { command } = params;
 
-      // 安全检查
       for (const blocked of BLOCKED) {
         if (command.toLowerCase().includes(blocked)) {
           return JSON.stringify({ error: '该命令被安全策略阻止' });
@@ -29,12 +27,26 @@ export function createShellTool(workspace: string): AgentTool {
       }
 
       try {
-        const output = execSync(command, {
-          cwd: workspace,
-          timeout: 30000,
-          encoding: 'utf-8',
-          maxBuffer: 1024 * 1024,
-        });
+        let output: string;
+
+        if (process.platform === 'win32') {
+          // Windows: 用 PowerShell 执行，UTF-8 输出
+          const psCmd = `powershell -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${command.replace(/"/g, '\\"')}"`;
+          output = execSync(psCmd, {
+            cwd: workspace,
+            timeout: 30000,
+            encoding: 'utf-8',
+            maxBuffer: 1024 * 1024,
+          });
+        } else {
+          output = execSync(command, {
+            cwd: workspace,
+            timeout: 30000,
+            encoding: 'utf-8',
+            maxBuffer: 1024 * 1024,
+          });
+        }
+
         return output;
       } catch (err: any) {
         return JSON.stringify({

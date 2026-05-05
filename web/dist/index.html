@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     :root {
       --bg-deep: #020a14;
@@ -43,7 +44,6 @@
       font-size: 15px;
     }
 
-    /* === GRID BACKGROUND === */
     body::before {
       content: '';
       position: fixed;
@@ -56,7 +56,6 @@
       z-index: 0;
     }
 
-    /* === LAYOUT === */
     .app {
       display: flex;
       height: 100vh;
@@ -71,6 +70,7 @@
       border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
+      flex-shrink: 0;
       position: relative;
       overflow: hidden;
     }
@@ -214,7 +214,6 @@
     .conv-item:hover .del { opacity: 0.6; }
     .conv-item .del:hover { color: var(--red); opacity: 1; }
 
-    /* === STATUS BAR === */
     .status-bar {
       padding: 12px 16px;
       border-top: 1px solid var(--border);
@@ -240,12 +239,13 @@
       50% { opacity: 0.4; }
     }
 
-    /* === MAIN CHAT === */
+    /* === MAIN AREA === */
     .main {
       flex: 1;
       display: flex;
       flex-direction: column;
       position: relative;
+      min-width: 0;
     }
 
     .main-header {
@@ -259,6 +259,7 @@
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-shrink: 0;
     }
 
     .main-header .line {
@@ -267,12 +268,21 @@
       background: linear-gradient(90deg, var(--border-active), transparent);
     }
 
+    /* === CONTENT AREA (messages + tool panel) === */
+    .content-area {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
     /* === MESSAGES === */
     .messages {
       flex: 1;
       overflow-y: auto;
       padding: 24px 32px;
       scroll-behavior: smooth;
+      min-width: 0;
     }
 
     .msg {
@@ -305,7 +315,6 @@
 
     .msg.user .msg-header { color: var(--orange); }
     .msg.assistant .msg-header { color: var(--cyan); }
-    .msg.tool .msg-header { color: var(--text-dim); }
 
     .msg-body {
       padding: 14px 18px;
@@ -329,48 +338,231 @@
       border-left: 3px solid var(--cyan-dim);
     }
 
-    .msg.tool .msg-body {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      font-family: var(--font-mono);
-      font-size: 12px;
-      color: var(--text-dim);
-      max-height: 200px;
-      overflow-y: auto;
+    /* === MARKDOWN RENDERING === */
+    .msg-body h1, .msg-body h2, .msg-body h3, .msg-body h4 {
+      color: var(--text-bright);
+      margin: 16px 0 8px;
+      font-family: var(--font-body);
+    }
+    .msg-body h1 { font-size: 20px; }
+    .msg-body h2 { font-size: 17px; }
+    .msg-body h3 { font-size: 15px; color: var(--cyan); }
+
+    .msg-body p {
+      margin: 8px 0;
     }
 
-    /* === TOOL CALL BOX === */
-    .tool-call {
-      background: var(--bg-card);
+    .msg-body ul, .msg-body ol {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+    .msg-body li {
+      margin: 4px 0;
+    }
+
+    .msg-body code {
+      background: rgba(0,229,255,0.08);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--cyan);
+    }
+
+    .msg-body pre {
+      background: var(--bg-deep);
       border: 1px solid var(--border);
       border-radius: 4px;
-      padding: 12px 16px;
-      margin: 8px 0;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      padding: 12px 14px;
+      margin: 10px 0;
+      overflow-x: auto;
+    }
+    .msg-body pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--text);
+      font-size: 12.5px;
     }
 
-    .tool-call .tc-icon {
-      width: 28px;
-      height: 28px;
+    .msg-body table {
+      border-collapse: collapse;
+      margin: 10px 0;
+      width: 100%;
+      font-size: 13px;
+    }
+    .msg-body th, .msg-body td {
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      text-align: left;
+    }
+    .msg-body th {
+      background: var(--bg-card);
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    .msg-body blockquote {
+      border-left: 3px solid var(--cyan-dim);
+      padding-left: 12px;
+      margin: 8px 0;
+      color: var(--text-dim);
+    }
+
+    .msg-body a {
+      color: var(--cyan);
+      text-decoration: none;
+    }
+    .msg-body a:hover {
+      text-decoration: underline;
+    }
+
+    .msg-body hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 16px 0;
+    }
+
+    .msg-body strong {
+      color: var(--text-bright);
+    }
+
+    /* === TOOL INDICATOR (inline in chat) === */
+    .tool-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--cyan-dim);
+      margin: 4px 0;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tool-indicator:hover {
+      border-color: var(--cyan-dim);
+      background: rgba(0,229,255,0.08);
+    }
+
+    .tool-indicator.running {
+      border-color: var(--cyan-dim);
+    }
+
+    .tool-indicator.running .ti-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--cyan);
+      border-radius: 50%;
+      animation: blink 1s ease-in-out infinite;
+    }
+
+    .tool-indicator.done .ti-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+    }
+
+    .tool-indicator .ti-name {
+      color: var(--cyan);
+    }
+
+    /* === TOOL PANEL (right side) === */
+    .tool-panel {
+      width: 0;
+      overflow: hidden;
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border);
+      transition: width 0.3s ease;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tool-panel.open {
+      width: 380px;
+    }
+
+    .tool-panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--cyan);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .tool-panel-close {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0 4px;
+      transition: color 0.2s;
+    }
+
+    .tool-panel-close:hover { color: var(--red); }
+
+    .tool-panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    .tool-entry {
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      animation: fadeSlideIn 0.3s ease-out;
+    }
+
+    .tool-entry-header {
+      padding: 10px 14px;
+      background: var(--bg-card);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .tool-entry-header:hover {
+      background: rgba(0,229,255,0.06);
+    }
+
+    .tool-entry-header .te-icon {
+      width: 24px;
+      height: 24px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 14px;
+      font-size: 12px;
       flex-shrink: 0;
     }
 
-    .tool-call.running .tc-icon {
+    .tool-entry.running .tool-entry-header .te-icon {
       background: var(--cyan-glow);
       color: var(--cyan);
       animation: spin 2s linear infinite;
     }
 
-    .tool-call.done .tc-icon {
+    .tool-entry.done .tool-entry-header .te-icon {
       background: rgba(0,230,118,0.15);
       color: var(--green);
     }
@@ -380,14 +572,78 @@
       to { transform: rotate(360deg); }
     }
 
-    .tool-call .tc-name { color: var(--cyan); font-weight: 600; }
-    .tool-call .tc-status { color: var(--text-dim); margin-left: auto; }
+    .tool-entry-header .te-name {
+      color: var(--cyan);
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .tool-entry-header .te-status {
+      color: var(--text-dim);
+      font-size: 10px;
+    }
+
+    .tool-entry-header .te-chevron {
+      color: var(--text-dim);
+      transition: transform 0.2s;
+      font-size: 10px;
+    }
+
+    .tool-entry.expanded .te-chevron {
+      transform: rotate(90deg);
+    }
+
+    .tool-entry-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .tool-entry.expanded .tool-entry-body {
+      max-height: 800px;
+    }
+
+    .tool-entry-content {
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.6;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border);
+    }
+
+    .tool-entry-content .label {
+      color: var(--cyan-dim);
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      margin-top: 8px;
+    }
+
+    .tool-entry-content .label:first-child {
+      margin-top: 0;
+    }
+
+    .tool-entry-content pre {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 8px 10px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 200px;
+      overflow-y: auto;
+      color: var(--text);
+    }
 
     /* === INPUT === */
     .input-area {
       padding: 20px 32px 24px;
       border-top: 1px solid var(--border);
       position: relative;
+      flex-shrink: 0;
     }
 
     .input-area::before {
@@ -507,7 +763,6 @@
       opacity: 0.6;
     }
 
-    /* Decorative corner brackets */
     .welcome::before, .welcome::after {
       content: '';
       position: absolute;
@@ -528,7 +783,6 @@
       border-width: 0 1px 1px 0;
     }
 
-    /* === SCANLINE EFFECT === */
     .scanline {
       position: fixed;
       top: 0;
@@ -547,13 +801,11 @@
       100% { top: 100vh; }
     }
 
-    /* === SCROLLBAR === */
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border-active); border-radius: 2px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--cyan-dim); }
 
-    /* === ERROR === */
     .msg.error .msg-body {
       background: rgba(255,23,68,0.08);
       border: 1px solid rgba(255,23,68,0.2);
@@ -561,7 +813,6 @@
       color: var(--red);
     }
 
-    /* === LOADING DOTS === */
     .loading-dots {
       display: inline-flex;
       gap: 4px;
@@ -608,15 +859,24 @@
         <span id="headerConvId">--</span>
       </div>
 
-      <!-- Welcome Screen -->
+      <!-- Welcome -->
       <div class="welcome" id="welcomeScreen">
         <div class="welcome-logo">JARVIS</div>
         <div class="welcome-sub">Just A Rather Very Intelligent System</div>
         <div class="welcome-hint">发送消息开始对话</div>
       </div>
 
-      <!-- Chat Area (hidden initially) -->
-      <div class="messages" id="messages" style="display:none"></div>
+      <!-- Content Area: messages + tool panel -->
+      <div class="content-area" id="contentArea" style="display:none">
+        <div class="messages" id="messages"></div>
+        <div class="tool-panel" id="toolPanel">
+          <div class="tool-panel-header">
+            <span>TOOL EXEC LOG</span>
+            <button class="tool-panel-close" onclick="closeToolPanel()">&times;</button>
+          </div>
+          <div class="tool-panel-body" id="toolPanelBody"></div>
+        </div>
+      </div>
 
       <!-- Input -->
       <div class="input-area">
@@ -637,6 +897,7 @@
     let currentConvId = null;
     let isStreaming = false;
     let streamContent = '';
+    let toolEntries = {};  // id -> { name, args, result, status }
 
     // === INIT ===
     function init() {
@@ -662,11 +923,24 @@
       });
 
       socket.on('tool_call', (data) => {
-        addToolCall(data.id, data.name);
+        toolEntries[data.id] = {
+          name: data.name,
+          args: data.arguments,
+          result: null,
+          status: 'running'
+        };
+        addToolIndicator(data.id, data.name);
+        openToolPanel();
+        renderToolPanel();
       });
 
       socket.on('tool_result', (data) => {
-        markToolDone(data.id);
+        if (toolEntries[data.id]) {
+          toolEntries[data.id].result = data.result;
+          toolEntries[data.id].status = 'done';
+        }
+        markToolIndicatorDone(data.id);
+        renderToolPanel();
       });
 
       socket.on('chat_done', (data) => {
@@ -674,7 +948,6 @@
         currentConvId = data.conversationId;
         updateSendBtn();
         loadConversations();
-        // 将流式占位转为正式消息
         finalizeStreamMessage();
       });
 
@@ -720,33 +993,59 @@
         const container = document.getElementById('messages');
         container.innerHTML = '';
 
-        // 先收集所有工具调用的 ID，用于后续匹配结果
-        const toolCallIds = new Set();
+        // 收集工具调用信息用于面板展示
+        const toolCallMap = {}; // tool_call_id -> { name, args }
+        const toolResultMap = {}; // tool_call_id -> result
+
         for (const m of data.messages) {
           if (m.role === 'assistant' && m.tool_calls) {
             try {
               const calls = JSON.parse(m.tool_calls);
-              calls.forEach(tc => toolCallIds.add(tc.id));
+              calls.forEach(tc => {
+                toolCallMap[tc.id] = { name: tc.function.name, args: tc.function.arguments };
+              });
             } catch {}
+          }
+          if (m.role === 'tool' && m.tool_call_id) {
+            toolResultMap[m.tool_call_id] = m.content || '';
           }
         }
 
+        // 构建工具面板数据
+        toolEntries = {};
+        for (const [id, tc] of Object.entries(toolCallMap)) {
+          toolEntries[id] = {
+            name: tc.name,
+            args: tc.args,
+            result: toolResultMap[id] || null,
+            status: toolResultMap[id] ? 'done' : 'running'
+          };
+        }
+
+        // 渲染消息
         for (const m of data.messages) {
           if (m.role === 'system') continue;
-
-          // 跳过只有 tool_calls 没有 content 的助手消息（避免空泡）
           if (m.role === 'assistant' && m.tool_calls && !m.content) continue;
 
-          // 渲染工具结果为紧凑的工具调用框
-          if (m.role === 'tool') {
-            const toolName = m.name || '工具';
-            const result = m.content || '';
-            const shortResult = result.length > 200 ? result.slice(0, 200) + '...' : result;
-            addToolResult(toolName, shortResult);
-            continue;
+          if (m.role === 'tool') continue; // 工具结果在面板中显示
+
+          // 如果是助手消息且前面有工具调用，添加工具指示器
+          if (m.role === 'assistant' && m.tool_calls) {
+            try {
+              const calls = JSON.parse(m.tool_calls);
+              calls.forEach(tc => {
+                addToolIndicator(tc.id, tc.function.name, true);
+              });
+            } catch {}
           }
 
           addMessage(m.role, m.content || '');
+        }
+
+        // 如果有工具调用历史，打开面板
+        if (Object.keys(toolEntries).length > 0) {
+          openToolPanel();
+          renderToolPanel();
         }
       } catch (e) { console.error(e); }
     }
@@ -762,24 +1061,32 @@
 
     function newChat() {
       currentConvId = null;
+      toolEntries = {};
       showWelcome();
+      closeToolPanel();
       loadConversations();
     }
 
     // === UI ===
     function showChat(clearMessages) {
       document.getElementById('welcomeScreen').style.display = 'none';
-      const msgDiv = document.getElementById('messages');
-      msgDiv.style.display = 'block';
+      document.getElementById('contentArea').style.display = 'flex';
       if (clearMessages) {
-        msgDiv.innerHTML = '';
+        document.getElementById('messages').innerHTML = '';
       }
     }
 
     function showWelcome() {
       document.getElementById('welcomeScreen').style.display = 'flex';
-      document.getElementById('messages').style.display = 'none';
+      document.getElementById('contentArea').style.display = 'none';
       document.getElementById('headerConvId').textContent = '--';
+    }
+
+    function renderMarkdown(text) {
+      if (typeof marked !== 'undefined' && marked.parse) {
+        return marked.parse(text, { breaks: true, gfm: true });
+      }
+      return escHtml(text);
     }
 
     function addMessage(role, content) {
@@ -787,9 +1094,10 @@
       const label = role === 'user' ? 'YOU' : role === 'assistant' ? 'JARVIS' : 'SYSTEM';
       const div = document.createElement('div');
       div.className = `msg ${role}`;
+      const bodyHtml = role === 'assistant' ? renderMarkdown(content) : escHtml(content);
       div.innerHTML = `
         <div class="msg-header">${label}</div>
-        <div class="msg-body">${escHtml(content)}</div>
+        <div class="msg-body">${bodyHtml}</div>
       `;
       container.appendChild(div);
       scrollToBottom();
@@ -813,7 +1121,7 @@
     function updateStreamingMessage(content) {
       const body = document.getElementById('streamingBody');
       if (body) {
-        body.textContent = content;
+        body.innerHTML = renderMarkdown(content);
         scrollToBottom();
       }
     }
@@ -824,58 +1132,97 @@
     }
 
     function finalizeStreamMessage() {
-      // 将流式消息占位转为正式消息
       const el = document.getElementById('streamingMsg');
       if (el) {
         el.removeAttribute('id');
         const body = el.querySelector('#streamingBody');
         if (body) body.removeAttribute('id');
       }
-      // 清理工具调用中的旋转动画
-      document.querySelectorAll('.tool-call.running').forEach(tc => {
-        tc.className = 'tool-call done';
-        const status = tc.querySelector('.tc-status');
-        if (status) status.textContent = '完成';
-        const icon = tc.querySelector('.tc-icon');
-        if (icon) icon.textContent = '✓';
-      });
       streamContent = '';
     }
 
-    function addToolCall(id, name) {
+    // === TOOL INDICATORS (inline in chat) ===
+    function addToolIndicator(id, name, done) {
       const container = document.getElementById('messages');
       const div = document.createElement('div');
-      div.className = 'tool-call running';
-      div.id = `tc-${id}`;
+      div.className = `tool-indicator ${done ? 'done' : 'running'}`;
+      div.id = `ti-${id}`;
+      div.onclick = () => openToolPanel();
       div.innerHTML = `
-        <div class="tc-icon">⚙</div>
-        <span class="tc-name">${escHtml(name)}</span>
-        <span class="tc-status">执行中...</span>
+        <span class="ti-dot"></span>
+        <span class="ti-name">${escHtml(name)}</span>
+        <span>${done ? '完成' : '执行中...'}</span>
       `;
       container.appendChild(div);
       scrollToBottom();
     }
 
-    function markToolDone(id) {
-      const el = document.getElementById(`tc-${id}`);
+    function markToolIndicatorDone(id) {
+      const el = document.getElementById(`ti-${id}`);
       if (el) {
-        el.className = 'tool-call done';
-        el.querySelector('.tc-status').textContent = '完成';
-        el.querySelector('.tc-icon').textContent = '✓';
+        el.className = 'tool-indicator done';
+        const spans = el.querySelectorAll('span');
+        if (spans[2]) spans[2].textContent = '完成';
       }
     }
 
-    function addToolResult(name, result) {
-      const container = document.getElementById('messages');
-      const div = document.createElement('div');
-      div.className = 'tool-call done';
-      div.innerHTML = `
-        <div class="tc-icon">✓</div>
-        <span class="tc-name">${escHtml(name)}</span>
-        <span class="tc-status" style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim);max-width:500px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(result)}</span>
-      `;
-      container.appendChild(div);
-      scrollToBottom();
+    // === TOOL PANEL (right side) ===
+    function openToolPanel() {
+      document.getElementById('toolPanel').classList.add('open');
+    }
+
+    function closeToolPanel() {
+      document.getElementById('toolPanel').classList.remove('open');
+    }
+
+    function renderToolPanel() {
+      const body = document.getElementById('toolPanelBody');
+      const entries = Object.entries(toolEntries);
+
+      body.innerHTML = entries.map(([id, entry]) => {
+        const statusIcon = entry.status === 'done' ? '✓' : '⚙';
+        const statusText = entry.status === 'done' ? '完成' : '执行中...';
+
+        let argsHtml = '';
+        try {
+          const parsed = JSON.parse(entry.args);
+          argsHtml = `<div class="label">参数</div><pre>${escHtml(JSON.stringify(parsed, null, 2))}</pre>`;
+        } catch {
+          argsHtml = `<div class="label">参数</div><pre>${escHtml(entry.args || '')}</pre>`;
+        }
+
+        let resultHtml = '';
+        if (entry.result) {
+          const shortResult = entry.result.length > 500 ? entry.result.slice(0, 500) + '...' : entry.result;
+          resultHtml = `<div class="label">结果</div><pre>${escHtml(shortResult)}</pre>`;
+        }
+
+        return `
+          <div class="tool-entry ${entry.status}" id="te-${id}">
+            <div class="tool-entry-header" onclick="toggleToolEntry('${id}')">
+              <span class="te-icon">${statusIcon}</span>
+              <span class="te-name">${escHtml(entry.name)}</span>
+              <span class="te-status">${statusText}</span>
+              <span class="te-chevron">▶</span>
+            </div>
+            <div class="tool-entry-body">
+              <div class="tool-entry-content">
+                ${argsHtml}
+                ${resultHtml}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // 自动展开最新的
+      const last = body.querySelector('.tool-entry:last-child');
+      if (last) last.classList.add('expanded');
+    }
+
+    function toggleToolEntry(id) {
+      const el = document.getElementById(`te-${id}`);
+      if (el) el.classList.toggle('expanded');
     }
 
     function scrollToBottom() {
@@ -905,8 +1252,10 @@
       input.value = '';
       input.style.height = 'auto';
 
-      // 新会话时清空消息区域，避免串到旧对话
       const isNew = !currentConvId;
+      if (isNew) {
+        toolEntries = {};
+      }
       showChat(isNew);
       addMessage('user', msg);
 
@@ -920,7 +1269,6 @@
       document.getElementById('sendBtn').disabled = isStreaming;
     }
 
-    // Auto-resize textarea
     document.addEventListener('DOMContentLoaded', () => {
       const textarea = document.getElementById('userInput');
       textarea.addEventListener('input', () => {

@@ -25,6 +25,13 @@ function findPython(): string {
 }
 
 export function createCodeExecTool(): AgentTool {
+  const execOpts = {
+    timeout: 30000,
+    encoding: 'utf-8' as const,
+    maxBuffer: 1024 * 1024,
+    env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+  };
+
   return {
     name: 'code_exec',
     description: '代码执行工具。可以执行 JavaScript 或 Python 代码片段并返回结果。',
@@ -52,11 +59,7 @@ export function createCodeExecTool(): AgentTool {
           const tmpFile = path.join(tmpDir, `jarvis_exec_${Date.now()}.js`);
           fs.writeFileSync(tmpFile, code, 'utf-8');
           try {
-            const output = execSync(`node "${tmpFile}"`, {
-              timeout: 30000,
-              encoding: 'utf-8',
-              maxBuffer: 1024 * 1024,
-            });
+            const output = execSync(`node "${tmpFile}"`, execOpts);
             return output;
           } finally {
             fs.unlinkSync(tmpFile);
@@ -68,11 +71,14 @@ export function createCodeExecTool(): AgentTool {
           const tmpFile = path.join(tmpDir, `jarvis_exec_${Date.now()}.py`);
           fs.writeFileSync(tmpFile, code, 'utf-8');
           try {
-            const output = execSync(`${pythonCmd} "${tmpFile}"`, {
-              timeout: 30000,
-              encoding: 'utf-8',
-              maxBuffer: 1024 * 1024,
-            });
+            let cmd: string;
+            if (process.platform === 'win32') {
+              // Windows: 用 PowerShell 执行，确保 UTF-8 输出
+              cmd = `powershell -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; & '${pythonCmd}' '${tmpFile}'"`;
+            } else {
+              cmd = `${pythonCmd} "${tmpFile}"`;
+            }
+            const output = execSync(cmd, execOpts);
             return output;
           } finally {
             fs.unlinkSync(tmpFile);
