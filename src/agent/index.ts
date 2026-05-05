@@ -5,6 +5,12 @@ import { getSystemPrompt, summarizeConversation } from '../memory';
 import { saveMessage, getMessages } from '../db/messages';
 import { touchConversation } from '../db/conversations';
 
+function sanitizeContent(text: string | null): string | null {
+  if (!text) return null;
+  // 移除 Unicode 控制字符和替换字符（U+FFFD），保留正常文本
+  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F�]/g, '').trim() || null;
+}
+
 const MAX_TOOL_ROUNDS = 10;
 
 export class Agent {
@@ -55,7 +61,7 @@ export class Agent {
 
       // 如果没有工具调用，直接返回
       if (response.toolCalls.length === 0) {
-        finalContent = response.content || '';
+        finalContent = sanitizeContent(response.content) || '';
         // 保存助手回复
         const assistantMsg: ChatMessage = {
           role: 'assistant',
@@ -65,14 +71,19 @@ export class Agent {
         break;
       }
 
-      // 有工具调用：保存助手消息（含工具调用）
+      // 有工具调用：保存助手消息（含工具调用，清空 content 避免存储无意义的前缀文本）
       const assistantMsg: ChatMessage = {
         role: 'assistant',
-        content: response.content,
+        content: null,
         tool_calls: response.toolCalls,
       };
       saveMessage(conversationId, assistantMsg);
-      messages.push(assistantMsg);
+      // 保持原始 content 用于模型上下文（不存入数据库）
+      messages.push({
+        role: 'assistant',
+        content: response.content,
+        tool_calls: response.toolCalls,
+      });
 
       // 执行所有工具调用
       for (const toolCall of response.toolCalls) {

@@ -1161,10 +1161,18 @@
 
       socket.on('chat_token', (data) => {
         streamContent += data.token;
-        updateStreamingMessage(streamContent);
+        // 如果流式占位符不存在（被工具调用移除），重新创建
+        if (!document.getElementById('streamingMsg')) {
+          addAssistantPlaceholder();
+        }
+        updateStreamingMessage(sanitizeText(streamContent));
       });
 
       socket.on('tool_call', (data) => {
+        // 清除流式输出的"思考"文本（工具调用前的无用前缀）
+        removeStreamingPlaceholder();
+        streamContent = '';
+
         toolEntries[data.id] = {
           name: data.name,
           args: data.arguments,
@@ -1190,7 +1198,12 @@
         currentConvId = data.conversationId;
         updateSendBtn();
         loadConversations();
-        finalizeStreamMessage();
+        // 如果流式内容为空（工具调用后无文本回复），移除占位符
+        if (!streamContent) {
+          removeStreamingPlaceholder();
+        } else {
+          finalizeStreamMessage();
+        }
       });
 
       socket.on('chat_error', (data) => {
@@ -1284,11 +1297,9 @@
         // 渲染消息
         for (const m of data.messages) {
           if (m.role === 'system') continue;
-          if (m.role === 'assistant' && m.tool_calls && !m.content) continue;
-
           if (m.role === 'tool') continue; // 工具结果在面板中显示
 
-          // 如果是助手消息且前面有工具调用，添加工具指示器
+          // 有 tool_calls 的助手消息：只显示工具指示器，不显示 content
           if (m.role === 'assistant' && m.tool_calls) {
             try {
               const calls = JSON.parse(m.tool_calls);
@@ -1296,6 +1307,7 @@
                 addToolIndicator(tc.id, tc.function.name, true);
               });
             } catch {}
+            continue; // 跳过 content，不添加普通气泡
           }
 
           addMessage(m.role, m.content || '');
@@ -1498,12 +1510,19 @@
       return escHtml(text);
     }
 
+    function sanitizeText(text) {
+      if (!text) return '';
+      // 移除 Unicode 替换字符（U+FFFD）和控制字符
+      return text.replace(/[�\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim();
+    }
+
     function addMessage(role, content) {
       const container = document.getElementById('messages');
       const label = role === 'user' ? 'YOU' : role === 'assistant' ? 'JARVIS' : 'SYSTEM';
       const div = document.createElement('div');
       div.className = `msg ${role}`;
-      const bodyHtml = role === 'assistant' ? renderMarkdown(content) : escHtml(content);
+      const clean = sanitizeText(content);
+      const bodyHtml = role === 'assistant' ? renderMarkdown(clean) : escHtml(clean);
       div.innerHTML = `
         <div class="msg-header">${label}</div>
         <div class="msg-body">${bodyHtml}</div>
@@ -1602,7 +1621,8 @@
 
         let resultHtml = '';
         if (entry.result) {
-          const shortResult = entry.result.length > 500 ? entry.result.slice(0, 500) + '...' : entry.result;
+          const cleanResult = sanitizeText(entry.result);
+          const shortResult = cleanResult.length > 500 ? cleanResult.slice(0, 500) + '...' : cleanResult;
           resultHtml = `<div class="label">结果</div><pre>${escHtml(shortResult)}</pre>`;
         }
 
