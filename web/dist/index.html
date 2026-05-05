@@ -73,6 +73,16 @@
       flex-shrink: 0;
       position: relative;
       overflow: hidden;
+      transition: width 0.25s ease;
+    }
+
+    .sidebar.collapsed {
+      width: 0;
+      border-right: none;
+    }
+
+    .sidebar.collapsed + .main {
+      flex: 1;
     }
 
     .sidebar::after {
@@ -84,6 +94,35 @@
       height: 100%;
       background: linear-gradient(180deg, transparent, var(--cyan-dim), transparent);
       opacity: 0.4;
+    }
+
+    .sidebar-toggle {
+      position: fixed;
+      top: 14px;
+      left: 252px;
+      z-index: 100;
+      width: 24px;
+      height: 24px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--cyan-dim);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: left 0.25s ease, color 0.15s;
+    }
+
+    .sidebar-toggle:hover {
+      color: var(--cyan);
+      border-color: var(--cyan-dim);
+    }
+
+    body.sidebar-collapsed .sidebar-toggle {
+      left: 12px;
     }
 
     .sidebar-header {
@@ -1221,9 +1260,10 @@
 </head>
 <body>
   <div class="scanline"></div>
+  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="收起/展开侧边栏">&#9776;</button>
   <div class="app">
     <!-- SIDEBAR -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="logo">JARVIS</div>
         <div class="logo-sub">Personal AI System</div>
@@ -1485,6 +1525,12 @@
         showWelcome();
       }
       loadConversations();
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('collapsed');
+      document.body.classList.toggle('sidebar-collapsed');
     }
 
     function newChat() {
