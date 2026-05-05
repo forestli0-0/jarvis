@@ -24,19 +24,18 @@ async function searchSogou(query: string): Promise<{ title: string; snippet: str
     if (!aMatch) continue;
 
     let link = aMatch[1];
-    const title = aMatch[2].replace(/<[^>]*>/g, '').trim();
+    let title = aMatch[2].replace(/<[^>]*>/g, '').trim();
     if (!title) continue;
 
     // 搜狗的链接可能是跳转链接，提取真实 URL
     const realUrl = link.match(/url=([^&"]+)/);
     if (realUrl) link = decodeURIComponent(realUrl[1]);
 
-    // 提取摘要
+    // 提取摘要（在 <div class="ft"> 中）
     let snippet = '';
-    const snippetMatch = block.match(/<p[^>]*class="[^"]*str[^"]*"[^>]*>([\s\S]*?)<\/p>/i)
-      || block.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
-    if (snippetMatch) {
-      snippet = snippetMatch[1].replace(/<[^>]*>/g, '').trim();
+    const ftMatch = block.match(/<div[^>]*class="ft"[^>]*>([\s\S]*?)<\/div>/i);
+    if (ftMatch) {
+      snippet = ftMatch[1].replace(/<[^>]*>/g, '').trim();
     }
 
     results.push({ url: link, title, snippet });
