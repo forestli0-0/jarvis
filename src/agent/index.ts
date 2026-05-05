@@ -98,7 +98,14 @@ export class Agent {
 
     // 异步触发记忆整理（不阻塞返回）
     const allMessages = getMessages(conversationId);
-    summarizeConversation(this.model, conversationId, allMessages).catch(() => {});
+    callbacks?.onMemoryStart?.();
+    summarizeConversation(this.model, conversationId, allMessages)
+      .then((newMemories) => {
+        callbacks?.onMemoryDone?.(newMemories);
+      })
+      .catch(() => {
+        callbacks?.onMemoryDone?.([]);
+      });
 
     callbacks?.onDone?.(finalContent);
     return finalContent;

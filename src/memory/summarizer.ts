@@ -16,9 +16,11 @@ export async function summarizeConversation(
   model: ModelAdapter,
   conversationId: string,
   messages: ChatMessage[]
-): Promise<void> {
+): Promise<{ type: string; content: string }[]> {
+  const newMemories: { type: string; content: string }[] = [];
+
   // 只处理有意义的对话（至少 2 条消息）
-  if (messages.length < 2) return;
+  if (messages.length < 2) return newMemories;
 
   // 取最近 20 条消息进行分析
   const recentMessages = messages.slice(-20);
@@ -32,23 +34,33 @@ export async function summarizeConversation(
       { role: 'user', content: conversationText },
     ]);
 
-    if (!response.content) return;
+    if (!response.content) return newMemories;
 
     const lines = response.content.split('\n').filter((l) => l.trim());
 
     for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed.startsWith('[FACT]')) {
-        saveMemory('fact', trimmed.replace('[FACT]', '').trim(), conversationId, 0.7);
+        const content = trimmed.replace('[FACT]', '').trim();
+        saveMemory('fact', content, conversationId, 0.7);
+        newMemories.push({ type: 'fact', content });
       } else if (trimmed.startsWith('[PREFERENCE]')) {
-        saveMemory('preference', trimmed.replace('[PREFERENCE]', '').trim(), conversationId, 0.6);
+        const content = trimmed.replace('[PREFERENCE]', '').trim();
+        saveMemory('preference', content, conversationId, 0.6);
+        newMemories.push({ type: 'preference', content });
       } else if (trimmed.startsWith('[TASK]')) {
-        saveMemory('task', trimmed.replace('[TASK]', '').trim(), conversationId, 0.8);
+        const content = trimmed.replace('[TASK]', '').trim();
+        saveMemory('task', content, conversationId, 0.8);
+        newMemories.push({ type: 'task', content });
       } else if (trimmed.startsWith('[SUMMARY]')) {
-        saveMemory('summary', trimmed.replace('[SUMMARY]', '').trim(), conversationId, 0.3);
+        const content = trimmed.replace('[SUMMARY]', '').trim();
+        saveMemory('summary', content, conversationId, 0.3);
+        newMemories.push({ type: 'summary', content });
       }
     }
   } catch {
     // 摘要失败不影响主流程
   }
+
+  return newMemories;
 }

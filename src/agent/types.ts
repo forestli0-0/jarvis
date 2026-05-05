@@ -36,4 +36,6 @@ export interface AgentCallbacks {
   onToolCall?: (toolCall: ToolCall) => void;
   onToolResult?: (toolCallId: string, result: string) => void;
   onDone?: (fullResponse: string) => void;
+  onMemoryStart?: () => void;
+  onMemoryDone?: (memories: { type: string; content: string }[]) => void;
 }

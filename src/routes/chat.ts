@@ -44,6 +44,12 @@ export function setupSocketHandlers(io: SocketServer) {
           onDone: (fullResponse) => {
             socket.emit('chat_done', { conversationId, content: fullResponse });
           },
+          onMemoryStart: () => {
+            socket.emit('memory_start');
+          },
+          onMemoryDone: (memories) => {
+            socket.emit('memory_done', { memories });
+          },
         });
       } catch (err: any) {
         socket.emit('chat_error', { error: err.message });
