@@ -13,6 +13,7 @@ import { createSearchTool } from './tools/search';
 import { createCodeExecTool } from './tools/code-exec';
 import { createShellTool } from './tools/shell';
 import { createMemoryTraceTool } from './tools/memory-trace';
+import { createWebFetchTool } from './tools/web-fetch';
 import { closeDb } from './db';
 import { consolidateMemories } from './memory';
 
@@ -30,6 +31,7 @@ toolRegistry.register(createSearchTool());
 toolRegistry.register(createCodeExecTool());
 toolRegistry.register(createShellTool(workspace));
 toolRegistry.register(createMemoryTraceTool());
+toolRegistry.register(createWebFetchTool());
 
 // 初始化模型和 Agent
 const model = new ModelAdapter(config.model);
