@@ -1914,10 +1914,12 @@
       if (el) el.classList.toggle('expanded');
     }
 
-    // ─── 智能滚动：流式生成时缓慢跟随，用户操作后停止 ───
+    // ─── 智能滚动：恒速平滑下移，用户操作后停止 ───
     let userHasScrolled = false;
     let scrollRaf = null;
     let isStreamingActive = false;
+    let lastScrollTime = 0;
+    const SCROLL_SPEED = 40; // 像素/秒，恒定速度
 
     function scrollToBottom() {
       const container = document.getElementById('messages');
@@ -1925,27 +1927,14 @@
       userHasScrolled = false;
     }
 
-    function smoothScrollToBottom() {
-      const container = document.getElementById('messages');
-      if (userHasScrolled) return;
-      const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
-      if (distance < 10) return;
-      // 缓慢滚动：每帧移动一小部分距离，而非瞬间跳到底部
-      const step = Math.max(2, distance * 0.08);
-      container.scrollTop += step;
-    }
-
     function startSmartScroll() {
       userHasScrolled = false;
       isStreamingActive = true;
+      lastScrollTime = performance.now();
       const container = document.getElementById('messages');
 
-      // 监听用户滚轮操作
       container.addEventListener('wheel', onUserScroll, { passive: true });
-      // 监听触摸拖拽
       container.addEventListener('touchmove', onUserScroll, { passive: true });
-
-      // 监听滚动到底部时重置状态（用户滚回底部 = 恢复跟随）
       container.addEventListener('scroll', onScrollCheck, { passive: true });
 
       tickScroll();
@@ -1961,22 +1950,28 @@
     }
 
     function onUserScroll(e) {
-      // 滚轮向上 = 用户要读上面的内容，停止跟随
-      if (e.deltaY < 0) {
-        userHasScrolled = true;
-      }
+      if (e.deltaY < 0) userHasScrolled = true;
     }
 
     function onScrollCheck() {
       const container = document.getElementById('messages');
       const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
-      // 用户滚回底部附近 = 重新跟随
       if (atBottom) userHasScrolled = false;
     }
 
-    function tickScroll() {
+    function tickScroll(now) {
       if (!isStreamingActive) return;
-      smoothScrollToBottom();
+      if (!userHasScrolled) {
+        const container = document.getElementById('messages');
+        const gap = container.scrollHeight - container.scrollTop - container.clientHeight;
+        if (gap > 4) {
+          // 恒速滚动：固定像素/秒，与内容增长无关
+          const dt = lastScrollTime ? (now - lastScrollTime) / 1000 : 0;
+          const step = Math.min(gap, SCROLL_SPEED * dt);
+          container.scrollTop += step;
+        }
+      }
+      lastScrollTime = now;
       scrollRaf = requestAnimationFrame(tickScroll);
     }
 
