@@ -94,9 +94,14 @@ export function saveMemory(
   content: string,
   sourceConversationId?: string,
   importance: number = 0.5
-): string {
+): string | null {
   const db = getDb();
-  const existing = findSimilarMemory(type, content);
+
+  // 验证内容非空
+  const trimmed = content.trim();
+  if (!trimmed || trimmed.length < 3) return null;
+
+  const existing = findSimilarMemory(type, trimmed);
 
   if (existing) {
     const newImportance = Math.min(1.0, existing.importance + 0.05);
@@ -121,7 +126,7 @@ export function saveMemory(
   db.prepare(`
     INSERT INTO memories (id, type, content, source_conversation_id, importance, tier, hit_count)
     VALUES (?, ?, ?, ?, ?, 'short', 0)
-  `).run(id, type, content, sourceConversationId || null, importance);
+  `).run(id, type, trimmed, sourceConversationId || null, importance);
 
   // 记录源头
   if (sourceConversationId) {
@@ -210,10 +215,11 @@ export function getMemoryChain(memoryId: string): MemoryChain | null {
 
 export function consolidateMemories(): number {
   const db = getDb();
+  // 超过 1 天的短期记忆，或命中次数 >= 3 的短期记忆，纳入整合
   const staleShort = db.prepare(`
     SELECT * FROM memories
     WHERE tier = 'short'
-      AND created_at < datetime('now', '-3 days')
+      AND (created_at < datetime('now', '-1 day') OR hit_count >= 3)
     ORDER BY created_at ASC
     LIMIT 50
   `).all() as Memory[];

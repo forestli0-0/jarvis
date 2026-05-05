@@ -8,12 +8,17 @@ const SUMMARIZE_PROMPT = `你是一个记忆管理助手。分析以下对话，
 {existing_memories}
 
 请按以下格式输出（每条一行，没有则留空）：
-[FACT] 用户相关的事实信息（职业、背景、技能等）
-[PREFERENCE] 用户的偏好（喜欢什么、不喜欢什么）
-[TASK] 用户提到的待办事项或项目
-[SUMMARY] 对话的简要摘要
+[FACT] 用户相关的事实信息（职业、背景、技能等）——限 3 条
+[PREFERENCE] 用户的偏好（喜欢什么、不喜欢什么）——限 2 条
+[TASK] 用户提到的待办事项或项目——限 2 条
+[SUMMARY] 对话的简要摘要（一句话）——限 1 条
 
-只输出以上格式的内容，不要有其他文字。只输出新信息，不要重复已有的记忆。`;
+规则：
+- 只输出新信息，不要重复已有的记忆
+- 只提取用户明确表达的信息，不要推测
+- 每条记忆限 50 字以内
+- 总共不超过 5 条
+- 没有新信息就什么都不输出`;
 
 export async function summarizeConversation(
   model: ModelAdapter,
@@ -70,10 +75,10 @@ export async function summarizeConversation(
         content = trimmed.replace('[SUMMARY]', '').trim();
       }
 
-      if (type && content) {
+      if (type && content && content.length >= 3 && content.length <= 200) {
         const importanceMap = { fact: 0.7, preference: 0.6, task: 0.8, summary: 0.3 };
-        saveMemory(type, content, conversationId, importanceMap[type]);
-        newMemories.push({ type, content });
+        const id = saveMemory(type, content, conversationId, importanceMap[type]);
+        if (id) newMemories.push({ type, content });
       }
     }
   } catch {

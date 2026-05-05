@@ -47,12 +47,6 @@ export function buildMemoryContext(): string {
     summaries.forEach((m) => parts.push(`- ${m.content}`));
   }
 
-  // 触碰所有注入的记忆（增加 hit_count）
-  const allInjected = [...allFacts, ...allPrefs, ...allTasks, ...summaries];
-  for (const m of allInjected) {
-    touchMemory(m.id);
-  }
-
   return parts.join('\n');
 }
 
