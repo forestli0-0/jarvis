@@ -512,23 +512,6 @@
       font-size: 12.5px;
     }
 
-    .msg-body .ascii-diagram {
-      margin: 10px 0;
-    }
-    .msg-body .ascii-diagram pre {
-      background: var(--bg-deep);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--cyan-dim);
-      border-radius: 4px;
-      padding: 12px 16px;
-      font-family: var(--font-mono);
-      font-size: 12.5px;
-      line-height: 1.6;
-      color: var(--text);
-      white-space: pre;
-      overflow-x: auto;
-    }
-
     .msg-body table {
       border-collapse: collapse;
       margin: 10px 0;
@@ -1866,201 +1849,9 @@
       document.getElementById('memoryToast').classList.remove('show');
     }
 
-    function isDiagramLine(line) {
-      // 包含箭头、流程图符号、大量连续横线 → 不是表格
-      if (/[→←↑↓]{2,}-{2,}|>{2,}|<{2,}|---+>|<---+|─+>|<─+|─+→|←─+/.test(line)) return true;
-      if (/─{3,}.*[→←>]|─{3,}.*[→←>]/.test(line)) return true;
-      // 包含方框字符
-      if (/[┌┐└┘│─╔╗╚╝║═]/.test(line)) return true;
-      // 包含特殊图解符号
-      if (/\[FIN|CLOSE|TIME|LISTEN|SYN|ESTAB|WAIT|ACK|SEQ/i.test(line)) return true;
-      // 包含 ──────> 或 <────── 箭头模式
-      if (/-{2,}>|<-{2,}/.test(line)) return true;
-      return false;
-    }
-
-    function isLikelyTable(rows) {
-      if (rows.length < 2) return false;
-      const maxCols = Math.max(...rows.map(r => r.length));
-      if (maxCols < 2) return false;
-
-      // 大部分行的列数一致
-      const consistentRows = rows.filter(r => r.length >= maxCols - 1 && r.length <= maxCols + 1);
-      if (consistentRows.length < rows.length * 0.7) return false;
-
-      // 大部分单元格有实质内容（不是空的或只有符号）
-      let filledCells = 0;
-      let totalCells = 0;
-      for (const row of rows) {
-        for (const cell of row) {
-          totalCells++;
-          if (cell && cell.length > 1 && !/^[\s\-—=|+<>↑↓→←]+$/.test(cell)) {
-            filledCells++;
-          }
-        }
-      }
-      // 至少 40% 的单元格有内容（允许空单元格）
-      return filledCells / totalCells > 0.35;
-    }
-
-    function preprocessAsciiDiagrams(text) {
-      // 检测连续多行含 | 的 ASCII 图解，用等宽容器包裹
-      const lines = text.split('\n');
-      const result = [];
-      let i = 0;
-
-      while (i < lines.length) {
-        // 找连续含 | 的行块（至少3行）
-        if (/\|/.test(lines[i])) {
-          const block = [];
-          let j = i;
-          while (j < lines.length && /\|/.test(lines[j])) {
-            block.push(lines[j]);
-            j++;
-          }
-
-          if (block.length >= 3) {
-            // 检查 | 的位置是否大致对齐（至少3行有 | 在相近位置）
-            const pipePositions = block.map(l => {
-              const pos = [];
-              for (let k = 0; k < l.length; k++) if (l[k] === '|') pos.push(k);
-              return pos;
-            });
-
-            // 检查是否有公共的列位置（±2字符容差）
-            if (pipePositions[0].length > 0) {
-              let alignedCols = 0;
-              for (const refPos of pipePositions[0]) {
-                let matchCount = 0;
-                for (let r = 1; r < pipePositions.length; r++) {
-                  if (pipePositions[r].some(p => Math.abs(p - refPos) <= 2)) matchCount++;
-                }
-                if (matchCount >= Math.floor(block.length * 0.5)) alignedCols++;
-              }
-
-              // 有2列以上对齐 → 检查是否是图解
-              if (alignedCols >= 2) {
-                // 块内任意一行有图解符号，或空单元格较多（不像数据表格）
-                const hasDiagram = block.some(l => isDiagramLine(l));
-                const mostlyEmpty = block.filter(l => {
-                  const cells = l.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|');
-                  return cells.filter(c => c.trim().length > 1).length <= 1;
-                }).length > block.length * 0.4;
-
-                if (hasDiagram || mostlyEmpty) {
-                  result.push('<div class="ascii-diagram"><pre>' + block.join('\n') + '</pre></div>');
-                  i = j;
-                  continue;
-                }
-              }
-            }
-          }
-        }
-
-        result.push(lines[i]);
-        i++;
-      }
-
-      return result.join('\n');
-    }
-
-
-    function preprocessAsciiTables(text) {
-      const lines = text.split('\n');
-      const result = [];
-      let i = 0;
-
-      while (i < lines.length) {
-        const tableStart = i;
-        const rows = [];
-
-        // 检查是否是 +---+ 边框格式
-        if (i < lines.length && /^\s*\+[-+]+\+\s*$/.test(lines[i])) {
-          i++;
-          while (i < lines.length && /\|/.test(lines[i]) && !/^\s*\+[-+]+\+\s*$/.test(lines[i])) {
-            const cleanCells = lines[i]
-              .replace(/^\s*\|/, '').replace(/\|\s*$/, '')
-              .split('|').map(c => c.trim());
-            if (cleanCells.length >= 2) rows.push(cleanCells);
-            i++;
-          }
-          if (i < lines.length && /^\s*\+[-+]+\+\s*$/.test(lines[i])) i++;
-
-          if (rows.length >= 2 && isLikelyTable(rows)) {
-            result.push(convertToMarkdownTable(rows));
-            continue;
-          }
-          i = tableStart;
-        }
-
-        // 检查是否是 | 分隔格式
-        if (i + 2 < lines.length && /^\s*\|/.test(lines[i])) {
-          // 先收集所有连续的 | 行
-          const block = [];
-          let j = i;
-          while (j < lines.length && /^\s*\|/.test(lines[j])) {
-            block.push(lines[j]);
-            j++;
-          }
-
-          // 整块都不能包含图解符号
-          const hasDiagram = block.some(l => isDiagramLine(l));
-
-          if (!hasDiagram && block.length >= 3) {
-            const tableRows = block.map(l =>
-              l.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(c => c.trim())
-            );
-
-            // 检查是否有 --- 分隔行
-            const sepIdx = tableRows.findIndex(r => r.every(c => /^[-:]+$/.test(c)));
-            if (sepIdx > 0 && tableRows.length >= 3) {
-              const dataRows = tableRows.filter((_, idx) => idx !== sepIdx);
-              if (isLikelyTable(dataRows)) {
-                result.push(convertToMarkdownTable(dataRows));
-                i = j;
-                continue;
-              }
-            }
-
-            // 没有分隔线，检查是否像表格
-            if (isLikelyTable(tableRows)) {
-              result.push(convertToMarkdownTable(tableRows));
-              i = j;
-              continue;
-            }
-          }
-        }
-
-        result.push(lines[i]);
-        i++;
-      }
-
-      return result.join('\n');
-    }
-
-    function convertToMarkdownTable(rows) {
-      if (rows.length === 0) return '';
-      const maxCols = Math.max(...rows.map(r => r.length));
-      // 补齐列数
-      rows.forEach(r => { while (r.length < maxCols) r.push(''); });
-
-      const header = rows[0];
-      const sep = header.map(() => '---');
-      const data = rows.slice(1);
-
-      let md = '| ' + header.join(' | ') + ' |\n';
-      md += '| ' + sep.join(' | ') + ' |\n';
-      data.forEach(r => { md += '| ' + r.join(' | ') + ' |\n'; });
-      return md;
-    }
-
-
     function renderMarkdown(text) {
       if (typeof marked !== 'undefined' && marked.parse) {
-        text = preprocessAsciiDiagrams(text);
-        text = preprocessAsciiTables(text);
-        let html = marked.parse(text, { breaks: true, gfm: true });
-        return html;
+        return marked.parse(text, { breaks: true, gfm: true });
       }
       return escHtml(text);
     }
@@ -2083,7 +1874,6 @@
         <div class="msg-body">${bodyHtml}</div>
       `;
       container.appendChild(div);
-      normalizeBoxDrawingInPre(div);
       scrollToBottom();
       updateMsgNav();
     }
@@ -2105,44 +1895,11 @@
       updateMsgNav();
     }
 
-    function normalizeBoxDrawingInPre(container) {
-      container.querySelectorAll('pre').forEach(pre => {
-        if (!/[┌┐└┘─│├┤┬┴┼╔╗╚╝═║]/.test(pre.textContent)) return;
-        const lines = pre.textContent.split('\n');
-        let maxW = 0;
-        for (const l of lines) {
-          let w = 0;
-          for (const ch of l) {
-            const c = ch.charCodeAt(0);
-            w += (c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF) ||
-                 (c >= 0xFF00 && c <= 0xFFEF) || (c >= 0x3000 && c <= 0x303F) ? 2 : 1;
-          }
-          if (w > maxW) maxW = w;
-        }
-        const fixed = lines.map(line => {
-          let w = 0;
-          for (const ch of line) {
-            const c = ch.charCodeAt(0);
-            w += (c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF) ||
-                 (c >= 0xFF00 && c <= 0xFFEF) || (c >= 0x3000 && c <= 0x303F) ? 2 : 1;
-          }
-          const diff = maxW - w;
-          if (diff <= 0) return line;
-          const t = line.trimEnd();
-          const last = t[t.length - 1];
-          if (/[║│┘┐╗╝┤┘]/.test(last)) return t.slice(0, -1) + ' '.repeat(diff) + last;
-          return line + ' '.repeat(diff);
-        }).join('\n');
-        pre.textContent = fixed;
-      });
-    }
-
     let navUpdatePending = false;
     function updateStreamingMessage(content) {
       const body = document.getElementById('streamingBody');
       if (body) {
         body.innerHTML = renderMarkdown(content);
-        normalizeBoxDrawingInPre(body);
         // 节流更新导航条（每 500ms 最多一次）
         if (!navUpdatePending) {
           navUpdatePending = true;
