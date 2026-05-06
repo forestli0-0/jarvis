@@ -1903,116 +1903,23 @@
       return filledCells / totalCells > 0.35;
     }
 
-    // Box-drawing 字符集
-    const BOX_CHARS = '╔╗╚╝═║┌┐└┘─│├┤┬┴┼╠╣╬█▄▀▐▌░▒▓┓┏┛┗';
-
-    function isBoxDrawingLine(line) {
-      // 判断一行是否包含 box-drawing 边框字符（非 ASCII 的制表符）
-      return /[╔╗╚╝═║┌┐└┘─│├┤┬┴┼╠╣╬█▄▀]/.test(line);
-    }
-
-    function isBoxBlock(lines) {
-      // 判断一个行块是否是 box-drawing 框图（至少3行，含上下边框和侧边框）
-      if (lines.length < 3) return false;
-      const hasTop = /[╔┐╔═╗]/.test(lines[0]) || /┌.*─.*┐/.test(lines[0]);
-      const hasBottom = /[╚┘╚═╝]/.test(lines[lines.length-1]) || /└.*─.*┘/.test(lines[lines.length-1]);
-      const hasSides = lines.filter(l => /[║│]/.test(l)).length >= lines.length * 0.5;
-      return (hasTop || hasBottom) && hasSides;
-    }
-
-    function charVisualWidth(ch) {
-      const code = ch.charCodeAt(0);
-      // CJK 统一表意文字
-      if (code >= 0x4E00 && code <= 0x9FFF) return 2;
-      // CJK 扩展 A/B
-      if (code >= 0x3400 && code <= 0x4DBF) return 2;
-      if (code >= 0x20000 && code <= 0x2A6DF) return 2;
-      // CJK 兼容
-      if (code >= 0xF900 && code <= 0xFAFF) return 2;
-      // 全角标点和符号
-      if (code >= 0xFF00 && code <= 0xFFEF) return 2;
-      // 全角括号等
-      if (code >= 0x3000 && code <= 0x303F) return 2;
-      // CJK 符号和标点
-      if (code >= 0x3000 && code <= 0x303F) return 2;
-      // 中文括号（不在上述范围的）
-      if ('（）【】《》「」『』'.includes(ch)) return 2;
-      // box-drawing 字符在等宽字体中通常是 1 宽度
-      return 1;
-    }
-
-    function visualWidth(str) {
-      let w = 0;
-      for (const ch of str) w += charVisualWidth(ch);
-      return w;
-    }
-
-    function normalizeAsciiBoxAlign(lines) {
-      // 计算每行的视觉宽度，找到最大宽度
-      let maxVisualWidth = 0;
-      for (const line of lines) {
-        const vw = visualWidth(line);
-        if (vw > maxVisualWidth) maxVisualWidth = vw;
-      }
-
-      // 找到右边框字符（每行的最后一个非空白 box-drawing 字符）
-      // 补齐每行到相同视觉宽度
-      return lines.map(line => {
-        const vw = visualWidth(line);
-        const diff = maxVisualWidth - vw;
-        if (diff <= 0) return line;
-
-        // 找行尾：如果有右边框字符（如 ║ │ ┘ ┐），在右边框前插入空格
-        const trimmed = line.trimEnd();
-        const lastChar = trimmed[trimmed.length - 1];
-        const trailingSpaces = line.length - trimmed.length;
-
-        if (/[║│┘┐╗╝]/.test(lastChar)) {
-          // 右边框前补空格
-          return trimmed.slice(0, -1) + ' '.repeat(diff) + lastChar;
-        } else {
-          // 没有右边框，直接在行尾补空格
-          return line + ' '.repeat(diff);
-        }
-      });
-    }
-
     function preprocessAsciiDiagrams(text) {
-      // 检测连续多行含 box-drawing 字符或 | 的 ASCII 图解，用等宽容器包裹
+      // 检测连续多行含 | 的 ASCII 图解，用等宽容器包裹
       const lines = text.split('\n');
       const result = [];
       let i = 0;
 
       while (i < lines.length) {
-        // 找连续含 | 或 box-drawing 字符的行块（至少3行）
-        if (/\|/.test(lines[i]) || isBoxDrawingLine(lines[i])) {
+        // 找连续含 | 的行块（至少3行）
+        if (/\|/.test(lines[i])) {
           const block = [];
           let j = i;
-          while (j < lines.length && (/\|/.test(lines[j]) || isBoxDrawingLine(lines[j]) || lines[j].trim() === '')) {
-            if (lines[j].trim() === '' && j > i) {
-              // 空行：检查后面是否还有图解内容
-              let hasMore = false;
-              for (let k = j + 1; k < Math.min(j + 3, lines.length); k++) {
-                if (/\|/.test(lines[k]) || isBoxDrawingLine(lines[k])) { hasMore = true; break; }
-              }
-              if (!hasMore) break;
-            }
+          while (j < lines.length && /\|/.test(lines[j])) {
             block.push(lines[j]);
             j++;
           }
 
-          // 去除末尾空行
-          while (block.length > 0 && block[block.length - 1].trim() === '') block.pop();
-
           if (block.length >= 3) {
-            // 检查是否是 box-drawing 框图
-            if (isBoxBlock(block)) {
-              const normalized = normalizeAsciiBoxAlign(block);
-              result.push('<div class="ascii-diagram"><pre>' + normalized.join('\n') + '</pre></div>');
-              i = j;
-              continue;
-            }
-
             // 检查 | 的位置是否大致对齐（至少3行有 | 在相近位置）
             const pipePositions = block.map(l => {
               const pos = [];
@@ -2041,8 +1948,7 @@
                 }).length > block.length * 0.4;
 
                 if (hasDiagram || mostlyEmpty) {
-                  const normalized = normalizeAsciiBoxAlign(block);
-                  result.push('<div class="ascii-diagram"><pre>' + normalized.join('\n') + '</pre></div>');
+                  result.push('<div class="ascii-diagram"><pre>' + block.join('\n') + '</pre></div>');
                   i = j;
                   continue;
                 }
@@ -2057,6 +1963,7 @@
 
       return result.join('\n');
     }
+
 
     function preprocessAsciiTables(text) {
       const lines = text.split('\n');
@@ -2147,72 +2054,12 @@
       return md;
     }
 
-    function normalizeBoxAlignInHtml(html) {
-      // 后处理：修复 <pre><code> 中 box-drawing 框图的对齐
-      // marked 会把 ``` 代码块转成 <pre><code>，内容是 HTML 转义的
-      return html.replace(/<pre><code[^>]*>([\s\S]*?)<\/code><\/pre>/g, (match, content) => {
-        // HTML 反转义
-        const decoded = content
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'");
-
-        const decodedLines = decoded.split('\n');
-
-        // 检测是否包含 box-drawing 字符（框图）
-        const boxLineCount = decodedLines.filter(l => isBoxDrawingLine(l)).length;
-        if (boxLineCount < 3) return match;
-
-        // 检测是否有上下边框
-        const hasTopBorder = decodedLines.length > 0 && /[╔┌].*[═─].*[╗┐]/.test(decodedLines[0]);
-        const hasBottomBorder = decodedLines.length > 1 && /[╚└].*[═─].*[╝┘]/.test(decodedLines[decodedLines.length - 1]);
-
-        if (!hasTopBorder && !hasBottomBorder && boxLineCount < decodedLines.length * 0.5) return match;
-
-        // 计算最大视觉宽度
-        let maxVW = 0;
-        for (const line of decodedLines) {
-          const vw = visualWidth(line);
-          if (vw > maxVW) maxVW = vw;
-        }
-
-        // 修正每行对齐
-        const fixedLines = decodedLines.map(line => {
-          const vw = visualWidth(line);
-          const diff = maxVW - vw;
-          if (diff <= 0) return line;
-
-          const trimmed = line.trimEnd();
-          const lastChar = trimmed[trimmed.length - 1];
-
-          if (/[║│┘┐╗╝]/.test(lastChar)) {
-            return trimmed.slice(0, -1) + ' '.repeat(diff) + lastChar;
-          } else {
-            return line + ' '.repeat(diff);
-          }
-        });
-
-        // 重新转义后返回
-        const reEncoded = fixedLines.join('\n')
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
-
-        // 保留原标签属性
-        const tagMatch = match.match(/<pre><code([^>]*)>/);
-        const attrs = tagMatch ? tagMatch[1] : '';
-        return `<pre><code${attrs}>${reEncoded}</code></pre>`;
-      });
-    }
 
     function renderMarkdown(text) {
       if (typeof marked !== 'undefined' && marked.parse) {
         text = preprocessAsciiDiagrams(text);
         text = preprocessAsciiTables(text);
         let html = marked.parse(text, { breaks: true, gfm: true });
-        html = normalizeBoxAlignInHtml(html);
         return html;
       }
       return escHtml(text);
