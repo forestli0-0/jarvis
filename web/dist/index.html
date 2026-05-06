@@ -1962,15 +1962,15 @@
     }
 
     let navUpdatePending = false;
+    let pendingContent = null;
+
     function updateStreamingMessage(content) {
-      const body = document.getElementById('streamingBody');
-      if (body) {
-        body.innerHTML = renderMarkdown(content);
-        // 节流更新导航条（每 500ms 最多一次）
-        if (!navUpdatePending) {
-          navUpdatePending = true;
-          setTimeout(() => { updateMsgNav(); navUpdatePending = false; }, 500);
-        }
+      pendingContent = content;
+      // 实际渲染由 tickScroll 在下一帧统一执行（与滚动同步）
+      // 节流更新导航条（每 500ms 最多一次）
+      if (!navUpdatePending) {
+        navUpdatePending = true;
+        setTimeout(() => { updateMsgNav(); navUpdatePending = false; }, 500);
       }
     }
 
@@ -2162,7 +2162,7 @@
     let scrollRaf = null;
     let isStreamingActive = false;
     let lastScrollTime = 0;
-    const SCROLL_SPEED = 80; // 像素/秒，恒定速度
+    const SCROLL_SPEED = 100; // 像素/秒，恒定速度
 
     function scrollToBottom() {
       const container = document.getElementById('messages');
@@ -2204,11 +2204,14 @@
 
     function tickScroll(now) {
       if (!isStreamingActive) return;
+
+      // 先更新内容（在同一帧内，避免布局抖动）
+      flushPendingContent();
+
       if (!userHasScrolled) {
         const container = document.getElementById('messages');
         const gap = container.scrollHeight - container.scrollTop - container.clientHeight;
         if (gap > 4) {
-          // 恒速滚动：固定像素/秒，与内容增长无关
           const dt = lastScrollTime ? (now - lastScrollTime) / 1000 : 0;
           const step = Math.min(gap, SCROLL_SPEED * dt);
           container.scrollTop += step;
@@ -2216,6 +2219,14 @@
       }
       lastScrollTime = now;
       scrollRaf = requestAnimationFrame(tickScroll);
+    }
+
+    function flushPendingContent() {
+      const body = document.getElementById('streamingBody');
+      if (body && pendingContent !== null) {
+        body.innerHTML = renderMarkdown(pendingContent);
+        pendingContent = null;
+      }
     }
 
     function escHtml(str) {
