@@ -1964,7 +1964,12 @@
     function updateStreamingMessage(content) {
       const body = document.getElementById('streamingBody');
       if (body) {
+        const container = document.getElementById('messages');
+        // 保存当前距底距离
+        const gap = container.scrollHeight - container.scrollTop - container.clientHeight;
         body.innerHTML = renderMarkdown(content);
+        // 恢复距底距离，防止 innerHTML 重写导致抖动
+        container.scrollTop = container.scrollHeight - container.clientHeight - gap;
         // 节流更新导航条（每 500ms 最多一次）
         if (!navUpdatePending) {
           navUpdatePending = true;
