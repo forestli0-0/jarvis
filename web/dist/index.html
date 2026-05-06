@@ -1965,13 +1965,11 @@
 
     let navUpdatePending = false;
     let pendingContent = null;
-    // 增量渲染状态
     let streamingLastCommitted = '';
     let streamingBodyEl = null;
 
     function updateStreamingMessage(content) {
       pendingContent = content;
-      // 节流更新导航条（每 500ms 最多一次）
       if (!navUpdatePending) {
         navUpdatePending = true;
         setTimeout(() => { updateMsgNav(); navUpdatePending = false; }, 500);
@@ -1988,7 +1986,6 @@
 
     function finalizeStreamMessage() {
       stopSmartScroll();
-      // 最后一次全量刷新，确保内容完整
       if (streamingBodyEl && pendingContent !== null) {
         streamingBodyEl.innerHTML = renderMarkdown(pendingContent);
         pendingContent = null;
@@ -2238,33 +2235,36 @@
       if (!streamingBodyEl || pendingContent === null) return;
       if (pendingContent === streamingLastCommitted) { pendingContent = null; return; }
 
-      // 渲染到临时容器
       const tmp = document.createElement('div');
       tmp.innerHTML = renderMarkdown(pendingContent);
       streamingLastCommitted = pendingContent;
       pendingContent = null;
 
-      const newNodes = tmp.childNodes;
       const oldNodes = streamingBodyEl.childNodes;
+      const newNodes = tmp.childNodes;
+      const minLen = Math.min(oldNodes.length, newNodes.length);
 
-      if (oldNodes.length === 0) {
-        // 首次渲染（loading dots 之后）
-        while (tmp.firstChild) streamingBodyEl.appendChild(tmp.firstChild);
-      } else if (newNodes.length > oldNodes.length) {
-        // 新增了块 → 只追加新节点，已有节点不动
-        for (let i = oldNodes.length; i < newNodes.length; i++) {
-          streamingBodyEl.appendChild(newNodes[i].cloneNode(true));
+      // 从头找第一个差异点
+      let firstDiff = minLen;
+      for (let i = 0; i < minLen; i++) {
+        if (oldNodes[i].outerHTML !== newNodes[i].outerHTML) {
+          firstDiff = i;
+          break;
         }
-      } else if (newNodes.length === oldNodes.length) {
-        // 块数相同 → 最后一个块可能还在变化（未闭合的代码块等）
-        const lastOld = oldNodes[oldNodes.length - 1];
-        const lastNew = newNodes[newNodes.length - 1];
-        if (lastOld.outerHTML !== lastNew.outerHTML) {
-          streamingBodyEl.replaceChild(lastNew.cloneNode(true), lastOld);
-        }
-      } else {
-        // 块数减少（罕见，markdown 重新解析导致）→ 降级全量替换
-        streamingBodyEl.innerHTML = tmp.innerHTML;
+      }
+
+      if (firstDiff === minLen && newNodes.length === oldNodes.length) {
+        return; // 完全相同，无变化
+      }
+
+      // 删除 firstDiff 及之后的旧节点
+      while (streamingBodyEl.childNodes.length > firstDiff) {
+        streamingBodyEl.removeChild(streamingBodyEl.lastChild);
+      }
+
+      // 追加 firstDiff 及之后的新节点
+      for (let i = firstDiff; i < newNodes.length; i++) {
+        streamingBodyEl.appendChild(newNodes[i].cloneNode(true));
       }
     }
 
