@@ -89,9 +89,10 @@ export function getSystemPrompt(): string {
 - 绝对不要输出 HTML 标签（如 <div>、<pre>）
 - 结构化对比数据（优缺点、参数对比、特性列表等）必须使用标准 Markdown 表格语法
 - 流程图、架构图、状态机等使用 Mermaid 语法，包裹在 \`\`\`mermaid 代码块中
+- 对比类或平行结构的流程图优先使用 LR（从左到右）布局，优化横屏空间利用率
 - 示例：
   \`\`\`mermaid
-  graph TD
+  graph LR
     A[客户端] -->|RPC| B[服务器]
     B -->|响应| A
   \`\`\`
