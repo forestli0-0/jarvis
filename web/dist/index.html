@@ -2083,6 +2083,7 @@
         <div class="msg-body">${bodyHtml}</div>
       `;
       container.appendChild(div);
+      normalizeBoxDrawingInPre(div);
       scrollToBottom();
       updateMsgNav();
     }
@@ -2104,11 +2105,44 @@
       updateMsgNav();
     }
 
+    function normalizeBoxDrawingInPre(container) {
+      container.querySelectorAll('pre').forEach(pre => {
+        if (!/[┌┐└┘─│├┤┬┴┼╔╗╚╝═║]/.test(pre.textContent)) return;
+        const lines = pre.textContent.split('\n');
+        let maxW = 0;
+        for (const l of lines) {
+          let w = 0;
+          for (const ch of l) {
+            const c = ch.charCodeAt(0);
+            w += (c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF) ||
+                 (c >= 0xFF00 && c <= 0xFFEF) || (c >= 0x3000 && c <= 0x303F) ? 2 : 1;
+          }
+          if (w > maxW) maxW = w;
+        }
+        const fixed = lines.map(line => {
+          let w = 0;
+          for (const ch of line) {
+            const c = ch.charCodeAt(0);
+            w += (c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF) ||
+                 (c >= 0xFF00 && c <= 0xFFEF) || (c >= 0x3000 && c <= 0x303F) ? 2 : 1;
+          }
+          const diff = maxW - w;
+          if (diff <= 0) return line;
+          const t = line.trimEnd();
+          const last = t[t.length - 1];
+          if (/[║│┘┐╗╝┤┘]/.test(last)) return t.slice(0, -1) + ' '.repeat(diff) + last;
+          return line + ' '.repeat(diff);
+        }).join('\n');
+        pre.textContent = fixed;
+      });
+    }
+
     let navUpdatePending = false;
     function updateStreamingMessage(content) {
       const body = document.getElementById('streamingBody');
       if (body) {
         body.innerHTML = renderMarkdown(content);
+        normalizeBoxDrawingInPre(body);
         // 节流更新导航条（每 500ms 最多一次）
         if (!navUpdatePending) {
           navUpdatePending = true;
