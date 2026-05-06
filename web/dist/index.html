@@ -1938,11 +1938,20 @@
                 if (matchCount >= Math.floor(block.length * 0.5)) alignedCols++;
               }
 
-              // 有2列以上对齐 → 是图解，不是表格
-              if (alignedCols >= 2 && block.some(l => isDiagramLine(l))) {
-                result.push('<div class="ascii-diagram"><pre>' + block.join('\n') + '</pre></div>');
-                i = j;
-                continue;
+              // 有2列以上对齐 → 检查是否是图解
+              if (alignedCols >= 2) {
+                // 块内任意一行有图解符号，或空单元格较多（不像数据表格）
+                const hasDiagram = block.some(l => isDiagramLine(l));
+                const mostlyEmpty = block.filter(l => {
+                  const cells = l.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|');
+                  return cells.filter(c => c.trim().length > 1).length <= 1;
+                }).length > block.length * 0.4;
+
+                if (hasDiagram || mostlyEmpty) {
+                  result.push('<div class="ascii-diagram"><pre>' + block.join('\n') + '</pre></div>');
+                  i = j;
+                  continue;
+                }
               }
             }
           }
