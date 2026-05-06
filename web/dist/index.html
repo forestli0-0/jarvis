@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     :root {
       --bg-deep: #020a14;
@@ -510,6 +511,18 @@
       padding: 0;
       color: var(--text);
       font-size: 12.5px;
+    }
+    .msg-body .mermaid {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 16px;
+      margin: 10px 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+    .msg-body .mermaid svg {
+      max-width: 100%;
     }
 
     .msg-body table {
@@ -1849,11 +1862,62 @@
       document.getElementById('memoryToast').classList.remove('show');
     }
 
-    function renderMarkdown(text) {
+    // Mermaid 配置
+    if (typeof mermaid !== 'undefined') {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'dark',
+        themeVariables: {
+          primaryColor: '#0a1e2e',
+          primaryTextColor: '#c8dce8',
+          primaryBorderColor: '#00e5ff',
+          lineColor: '#00a0b4',
+          secondaryColor: '#061520',
+          tertiaryColor: '#081828',
+          noteTextColor: '#c8dce8',
+          noteBkgColor: '#0a1e2e',
+          noteBorderColor: '#1a4a5a',
+          fontFamily: 'Rajdhani, sans-serif'
+        }
+      });
+    }
+
+    // Marked 扩展：mermaid 代码块渲染为 <div class="mermaid">
+    if (typeof marked !== 'undefined') {
+      marked.use({
+        renderer: {
+          code({ text, lang }) {
+            if (lang === 'mermaid') {
+              return '<div class="mermaid">' + text + '</div>';
+            }
+            return false; // 使用默认渲染
+          }
+        }
+      });
+    }
+
+    function renderMarkdownAndDiagrams(text) {
       if (typeof marked !== 'undefined' && marked.parse) {
-        return marked.parse(text, { breaks: true, gfm: true });
+        const html = marked.parse(text, { breaks: true, gfm: true });
+        return html;
       }
       return escHtml(text);
+    }
+
+    // 异步渲染 mermaid 图表
+    async function renderMermaidIn(container) {
+      if (typeof mermaid === 'undefined') return;
+      const els = container.querySelectorAll('.mermaid:not([data-processed])');
+      if (els.length === 0) return;
+      try {
+        await mermaid.run({ nodes: els });
+      } catch (e) {
+        console.warn('Mermaid render error:', e);
+      }
+    }
+
+    function renderMarkdown(text) {
+      return renderMarkdownAndDiagrams(text);
     }
 
     function sanitizeText(text) {
@@ -1874,6 +1938,7 @@
         <div class="msg-body">${bodyHtml}</div>
       `;
       container.appendChild(div);
+      if (role === 'assistant') renderMermaidIn(div);
       scrollToBottom();
       updateMsgNav();
     }
@@ -1921,7 +1986,10 @@
         el.classList.remove('streaming');
         el.removeAttribute('id');
         const body = el.querySelector('#streamingBody');
-        if (body) body.removeAttribute('id');
+        if (body) {
+          body.removeAttribute('id');
+          renderMermaidIn(body);
+        }
       }
       streamContent = '';
     }
