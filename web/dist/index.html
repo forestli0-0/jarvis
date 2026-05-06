@@ -1849,70 +1849,99 @@
       document.getElementById('memoryToast').classList.remove('show');
     }
 
+    function isDiagramLine(line) {
+      // 包含箭头、流程图符号、大量连续横线 → 不是表格
+      if (/[→←↑↓<]{2,}-{2,}|>{2,}|<{2,}|---+>|<---+/.test(line)) return true;
+      // 包含方框字符
+      if (/[┌┐└┘│─╔╗╚╝║═]/.test(line)) return true;
+      // 包含特殊图解符号
+      if (/\[FIN|CLOSE|TIME|LISTEN|SYN|ESTAB|WAIT|ACK|SEQ/i.test(line)) return true;
+      return false;
+    }
+
+    function isLikelyTable(rows) {
+      if (rows.length < 2) return false;
+      const maxCols = Math.max(...rows.map(r => r.length));
+      if (maxCols < 2) return false;
+
+      // 大部分行的列数一致
+      const consistentRows = rows.filter(r => r.length >= maxCols - 1 && r.length <= maxCols + 1);
+      if (consistentRows.length < rows.length * 0.7) return false;
+
+      // 大部分单元格有实质内容（不是空的或只有符号）
+      let filledCells = 0;
+      let totalCells = 0;
+      for (const row of rows) {
+        for (const cell of row) {
+          totalCells++;
+          if (cell && cell.length > 1 && !/^[\s\-—=|+<>↑↓→←]+$/.test(cell)) {
+            filledCells++;
+          }
+        }
+      }
+      // 至少 40% 的单元格有内容（允许空单元格）
+      return filledCells / totalCells > 0.35;
+    }
+
     function preprocessAsciiTables(text) {
       const lines = text.split('\n');
       const result = [];
       let i = 0;
 
       while (i < lines.length) {
-        // 检测 ASCII 表格：连续多行包含 | 分隔符
-        // 格式1: +----+----+ 边框
-        // 格式2: | col | col | 带 --- 分隔线
         const tableStart = i;
         const rows = [];
 
         // 检查是否是 +---+ 边框格式
         if (i < lines.length && /^\s*\+[-+]+\+\s*$/.test(lines[i])) {
-          // 跳过顶部边框
           i++;
           while (i < lines.length && /\|/.test(lines[i]) && !/^\s*\+[-+]+\+\s*$/.test(lines[i])) {
-            const cells = lines[i].split('|').map(c => c.trim()).filter((c, idx, arr) => idx > 0 && idx < arr.length - 1 || (idx === 0 && c) || (idx === arr.length - 1 && c));
-            // 过滤掉首尾空元素
             const cleanCells = lines[i]
               .replace(/^\s*\|/, '').replace(/\|\s*$/, '')
               .split('|').map(c => c.trim());
             if (cleanCells.length >= 2) rows.push(cleanCells);
             i++;
           }
-          // 跳过底部边框
           if (i < lines.length && /^\s*\+[-+]+\+\s*$/.test(lines[i])) i++;
 
-          if (rows.length >= 2) {
+          if (rows.length >= 2 && isLikelyTable(rows)) {
             result.push(convertToMarkdownTable(rows));
             continue;
           }
-          // 如果没构成表格，回退
           i = tableStart;
         }
 
-        // 检查是否是 | 分隔格式（至少3行，中间有 --- 分隔线）
+        // 检查是否是 | 分隔格式
         if (i + 2 < lines.length && /^\s*\|/.test(lines[i])) {
-          const tableRows = [];
+          // 先收集所有连续的 | 行
+          const block = [];
           let j = i;
           while (j < lines.length && /^\s*\|/.test(lines[j])) {
-            const cells = lines[j]
-              .replace(/^\s*\|/, '').replace(/\|\s*$/, '')
-              .split('|').map(c => c.trim());
-            tableRows.push(cells);
+            block.push(lines[j]);
             j++;
           }
 
-          // 检查是否有 --- 分隔行
-          const sepIdx = tableRows.findIndex(r => r.every(c => /^[-:]+$/.test(c)));
-          if (sepIdx > 0 && tableRows.length >= 3) {
-            // 有效表格
-            const header = tableRows[0];
-            const dataRows = tableRows.filter((r, idx) => idx !== sepIdx);
-            result.push(convertToMarkdownTable(dataRows));
-            i = j;
-            continue;
-          }
+          // 整块都不能包含图解符号
+          const hasDiagram = block.some(l => isDiagramLine(l));
 
-          // 没有分隔线但有多行对齐的 | 也尝试转换
-          if (tableRows.length >= 3) {
-            const maxCols = Math.max(...tableRows.map(r => r.length));
-            // 检查列数是否一致
-            if (maxCols >= 2 && tableRows.every(r => r.length >= maxCols - 1)) {
+          if (!hasDiagram && block.length >= 3) {
+            const tableRows = block.map(l =>
+              l.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(c => c.trim())
+            );
+
+            // 检查是否有 --- 分隔行
+            const sepIdx = tableRows.findIndex(r => r.every(c => /^[-:]+$/.test(c)));
+            if (sepIdx > 0 && tableRows.length >= 3) {
+              const dataRows = tableRows.filter((_, idx) => idx !== sepIdx);
+              if (isLikelyTable(dataRows)) {
+                result.push(convertToMarkdownTable(dataRows));
+                i = j;
+                continue;
+              }
+            }
+
+            // 没有分隔线，检查是否像表格
+            if (isLikelyTable(tableRows)) {
               result.push(convertToMarkdownTable(tableRows));
               i = j;
               continue;
