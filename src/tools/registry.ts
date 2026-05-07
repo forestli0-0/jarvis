@@ -33,4 +33,8 @@ export class ToolRegistry {
       return JSON.stringify({ error: err.message || '工具执行失败' });
     }
   }
+
+  async executeParallel(calls: { name: string; params: any }[]): Promise<string[]> {
+    return Promise.all(calls.map(c => this.execute(c.name, c.params)));
+  }
 }

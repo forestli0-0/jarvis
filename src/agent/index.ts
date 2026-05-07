@@ -89,7 +89,8 @@ export class Agent {
         tool_calls: response.toolCalls,
       });
 
-      // 执行所有工具调用
+      // 并行执行所有工具调用
+      const toolCallsToExecute: { toolCall: ToolCall; args: any }[] = [];
       for (const toolCall of response.toolCalls) {
         let args: any = {};
         try {
@@ -108,19 +109,28 @@ export class Agent {
           messages.push(toolResultMsg);
           continue;
         }
+        toolCallsToExecute.push({ toolCall, args });
+      }
 
-        const result = await this.tools.execute(toolCall.function.name, args);
-        callbacks?.onToolResult?.(toolCall.id, result);
+      if (toolCallsToExecute.length > 0) {
+        const results = await Promise.all(
+          toolCallsToExecute.map(({ toolCall, args }) =>
+            this.tools.execute(toolCall.function.name, args)
+              .then(result => ({ toolCall, result }))
+          )
+        );
 
-        // 将工具结果加入消息列表
-        const toolResultMsg: ChatMessage = {
-          role: 'tool',
-          content: result,
-          tool_call_id: toolCall.id,
-          name: toolCall.function.name,
-        };
-        saveMessage(conversationId, toolResultMsg);
-        messages.push(toolResultMsg);
+        for (const { toolCall, result } of results) {
+          callbacks?.onToolResult?.(toolCall.id, result);
+          const toolResultMsg: ChatMessage = {
+            role: 'tool',
+            content: result,
+            tool_call_id: toolCall.id,
+            name: toolCall.function.name,
+          };
+          saveMessage(conversationId, toolResultMsg);
+          messages.push(toolResultMsg);
+        }
       }
     }
 
