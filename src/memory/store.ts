@@ -188,9 +188,10 @@ export function deleteMemory(id: string): void {
 
 export function searchMemories(query: string): Memory[] {
   const db = getDb();
+  const escaped = query.replace(/%/g, '\\%').replace(/_/g, '\\_');
   return db.prepare(
-    "SELECT * FROM memories WHERE content LIKE ? ORDER BY importance DESC LIMIT 20"
-  ).all(`%${query}%`) as Memory[];
+    "SELECT * FROM memories WHERE content LIKE ? ESCAPE '\\' ORDER BY importance DESC LIMIT 20"
+  ).all(`%${escaped}%`) as Memory[];
 }
 
 // === 记忆链追溯 ===
@@ -245,9 +246,14 @@ export function consolidateMemories(): number {
       let merged = false;
       for (const lt of longTermCandidates) {
         if (jaccardSimilarity(normalizeText(mem.content), normalizeText(lt.content)) > 0.5) {
-          const sourceIds = lt.consolidated_from
-            ? JSON.parse(lt.consolidated_from)
-            : [lt.id];
+          let sourceIds: string[];
+          try {
+            sourceIds = lt.consolidated_from
+              ? JSON.parse(lt.consolidated_from)
+              : [lt.id];
+          } catch {
+            sourceIds = [lt.id];
+          }
           sourceIds.push(mem.id);
 
           db.prepare(`

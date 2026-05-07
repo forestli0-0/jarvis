@@ -94,7 +94,20 @@ export class Agent {
         let args: any = {};
         try {
           args = JSON.parse(toolCall.function.arguments);
-        } catch {}
+        } catch {
+          console.error(`[Agent] 工具参数解析失败: ${toolCall.function.name}`, toolCall.function.arguments);
+          const errMsg = JSON.stringify({ error: `工具参数格式错误，无法解析 JSON: ${toolCall.function.arguments.slice(0, 200)}` });
+          callbacks?.onToolResult?.(toolCall.id, errMsg);
+          const toolResultMsg: ChatMessage = {
+            role: 'tool',
+            content: errMsg,
+            tool_call_id: toolCall.id,
+            name: toolCall.function.name,
+          };
+          saveMessage(conversationId, toolResultMsg);
+          messages.push(toolResultMsg);
+          continue;
+        }
 
         const result = await this.tools.execute(toolCall.function.name, args);
         callbacks?.onToolResult?.(toolCall.id, result);

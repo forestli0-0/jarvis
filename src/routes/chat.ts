@@ -12,6 +12,7 @@ export function setAgent(a: Agent) {
 export function setupSocketHandlers(io: SocketServer) {
   io.on('connection', (socket) => {
     console.log('客户端已连接:', socket.id);
+    const processing = new Set<string>();
 
     socket.on('chat', async (data: { conversationId?: string; message: string }) => {
       let conversationId = data.conversationId;
@@ -22,6 +23,13 @@ export function setupSocketHandlers(io: SocketServer) {
         conversationId = conv.id;
         socket.emit('conversation_created', { id: conversationId, title: conv.title });
       }
+
+      // 同一对话并发保护
+      if (processing.has(conversationId)) {
+        socket.emit('chat_error', { error: '该对话正在处理中，请等待完成' });
+        return;
+      }
+      processing.add(conversationId);
 
       // 通知前端开始生成
       socket.emit('chat_start', { conversationId });
@@ -53,6 +61,8 @@ export function setupSocketHandlers(io: SocketServer) {
         });
       } catch (err: any) {
         socket.emit('chat_error', { error: err.message });
+      } finally {
+        processing.delete(conversationId);
       }
     });
 

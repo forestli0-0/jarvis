@@ -90,6 +90,16 @@ export function createWebFetchTool(): AgentTool {
     async execute(params) {
       const { url } = params;
 
+      // 校验 URL 协议，只允许 http/https
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return JSON.stringify({ error: `不支持的协议: ${parsed.protocol}，仅支持 http/https`, url });
+        }
+      } catch {
+        return JSON.stringify({ error: `无效的 URL: ${url}`, url });
+      }
+
       try {
         const response = await fetch(url, {
           headers: {

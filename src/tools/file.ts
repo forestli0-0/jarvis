@@ -28,9 +28,12 @@ export function createFileTool(workspace: string): AgentTool {
     async execute(params) {
       const { action, path: filePath, content } = params;
       const fullPath = path.resolve(workspace, filePath);
+      const resolvedWorkspace = path.resolve(workspace);
 
-      // 安全检查：确保路径在工作目录内
-      if (!fullPath.startsWith(path.resolve(workspace))) {
+      // 安全检查：确保路径在工作目录内（统一小写比较，兼容 Windows）
+      const normalizedFull = process.platform === 'win32' ? fullPath.toLowerCase() : fullPath;
+      const normalizedWorkspace = process.platform === 'win32' ? resolvedWorkspace.toLowerCase() : resolvedWorkspace;
+      if (!normalizedFull.startsWith(normalizedWorkspace)) {
         return JSON.stringify({ error: '路径超出工作目录范围' });
       }
 

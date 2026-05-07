@@ -39,16 +39,33 @@ const DEFAULT_CONFIG: JarvisConfig = {
   workspace: './data/workspace',
 };
 
+function validateConfig(config: JarvisConfig): void {
+  if (!config.model.api_key) {
+    throw new Error('配置错误: model.api_key 未设置，请在 jarvis.config.json 中配置 API 密钥');
+  }
+  if (!config.model.base_url) {
+    throw new Error('配置错误: model.base_url 未设置');
+  }
+  if (!config.model.model_name) {
+    throw new Error('配置错误: model.model_name 未设置');
+  }
+  if (typeof config.server.port !== 'number' || config.server.port < 1 || config.server.port > 65535) {
+    throw new Error(`配置错误: server.port 无效 (${config.server.port})，应为 1-65535 的数字`);
+  }
+}
+
 export function loadConfig(): JarvisConfig {
   if (fs.existsSync(CONFIG_PATH)) {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
     const userConfig = JSON.parse(raw);
-    return {
+    const config: JarvisConfig = {
       model: { ...DEFAULT_CONFIG.model, ...userConfig.model },
       server: { ...DEFAULT_CONFIG.server, ...userConfig.server },
       workspace: userConfig.workspace || DEFAULT_CONFIG.workspace,
       search: userConfig.search,
     };
+    validateConfig(config);
+    return config;
   }
   // 如果配置文件不存在，创建默认配置
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf-8');

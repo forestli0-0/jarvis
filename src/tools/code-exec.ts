@@ -1,11 +1,10 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { AgentTool } from '../agent/types';
 
 function findPython(): string {
-  // 依次尝试常见 Python 路径
   const candidates = [
     'python',
     'python3',
@@ -17,11 +16,11 @@ function findPython(): string {
   ];
   for (const cmd of candidates) {
     try {
-      execSync(`${cmd} --version`, { timeout: 3000, encoding: 'utf-8', stdio: 'pipe' });
+      execFileSync(cmd, ['--version'], { timeout: 3000, encoding: 'utf-8', stdio: 'pipe' });
       return cmd;
     } catch {}
   }
-  return 'python'; // fallback
+  return 'python';
 }
 
 export function createCodeExecTool(): AgentTool {
@@ -59,8 +58,7 @@ export function createCodeExecTool(): AgentTool {
           const tmpFile = path.join(tmpDir, `jarvis_exec_${Date.now()}.js`);
           fs.writeFileSync(tmpFile, code, 'utf-8');
           try {
-            const output = execSync(`node "${tmpFile}"`, execOpts);
-            return output;
+            return execFileSync('node', [tmpFile], execOpts);
           } finally {
             fs.unlinkSync(tmpFile);
           }
@@ -71,15 +69,7 @@ export function createCodeExecTool(): AgentTool {
           const tmpFile = path.join(tmpDir, `jarvis_exec_${Date.now()}.py`);
           fs.writeFileSync(tmpFile, code, 'utf-8');
           try {
-            let cmd: string;
-            if (process.platform === 'win32') {
-              // Windows: 用 PowerShell 执行，确保 UTF-8 输出
-              cmd = `powershell -NoProfile -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; & '${pythonCmd}' '${tmpFile}'"`;
-            } else {
-              cmd = `${pythonCmd} "${tmpFile}"`;
-            }
-            const output = execSync(cmd, execOpts);
-            return output;
+            return execFileSync(pythonCmd, [tmpFile], execOpts);
           } finally {
             fs.unlinkSync(tmpFile);
           }

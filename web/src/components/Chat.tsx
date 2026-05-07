@@ -11,6 +11,7 @@ interface Props {
 }
 
 interface DisplayMessage {
+  id: string;
   role: 'user' | 'assistant' | 'tool';
   content: string;
   toolCalls?: { id: string; name: string; args: string }[];
@@ -25,6 +26,12 @@ export default function Chat({ socket, conversationId, onConversationCreated }: 
   const [activeToolCalls, setActiveToolCalls] = useState<{ id: string; name: string; done: boolean }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const msgIdCounter = useRef(0);
+  const conversationIdRef = useRef(conversationId);
+  const nextId = () => `local_${++msgIdCounter.current}`;
+
+  // 保持 ref 与 prop 同步
+  conversationIdRef.current = conversationId;
 
   // 加载对话历史
   useEffect(() => {
@@ -39,6 +46,7 @@ export default function Chat({ socket, conversationId, onConversationCreated }: 
           const displayMessages: DisplayMessage[] = data.messages
             .filter((m: any) => m.role !== 'system')
             .map((m: any) => ({
+              id: m.id || nextId(),
               role: m.role,
               content: m.content || '',
             }));
@@ -79,17 +87,19 @@ export default function Chat({ socket, conversationId, onConversationCreated }: 
       );
     };
 
-    const handleChatDone = () => {
+    const handleChatDone = (data?: { conversationId?: string }) => {
       setLoading(false);
-      // 重新加载对话以获取完整消息
-      if (conversationId) {
-        fetch(`/api/conversations/${conversationId}`)
+      // 使用事件中的 conversationId（若无则用 ref 中的最新值）
+      const activeId = data?.conversationId || conversationIdRef.current;
+      if (activeId) {
+        fetch(`/api/conversations/${activeId}`)
           .then((r) => r.json())
           .then((data) => {
             if (data.messages) {
               const displayMessages: DisplayMessage[] = data.messages
                 .filter((m: any) => m.role !== 'system')
                 .map((m: any) => ({
+                  id: m.id || nextId(),
                   role: m.role,
                   content: m.content || '',
                 }));
@@ -105,7 +115,7 @@ export default function Chat({ socket, conversationId, onConversationCreated }: 
       setLoading(false);
       setStreamingContent('');
       setActiveToolCalls([]);
-      setMessages((prev) => [...prev, { role: 'assistant', content: `错误: ${data.error}` }]);
+      setMessages((prev) => [...prev, { id: nextId(), role: 'assistant', content: `错误: ${data.error}` }]);
     };
 
     socket.on('conversation_created', handleConversationCreated);
@@ -137,7 +147,7 @@ export default function Chat({ socket, conversationId, onConversationCreated }: 
 
     const message = input.trim();
     setInput('');
-    setMessages((prev) => [...prev, { role: 'user', content: message }]);
+    setMessages((prev) => [...prev, { id: nextId(), role: 'user', content: message }]);
 
     socket.emit('chat', {
       conversationId,
@@ -192,8 +202,8 @@ export default function Chat({ socket, conversationId, onConversationCreated }: 
   return (
     <div className="chat">
       <div className="chat-messages">
-        {messages.map((msg, i) => (
-          <MessageBubble key={i} message={msg} />
+        {messages.map((msg) => (
+          <MessageBubble key={msg.id} message={msg} />
         ))}
         {activeToolCalls.length > 0 && (
           <div className="message assistant">
